@@ -86,6 +86,28 @@ StringBuilder可变，线程不安全
 
 接口连接的两方是两个类，即实现方（把方法具体实现出来）和调用方（只调用接口实现功能，依赖接口而不依赖具体实现类））
 
+==this() & super()==
+
+this代表这个的。super代表父类的
+
+==构造器==
+
+构造器本质是一个方法，用于在创建一个类的时候对他进行参数的初始化
+
+```java
+class Cat {
+    String name;
+    int age;
+    public Cat (String pName,int pAge){
+        name=pName;
+        age=pAge;
+    }//一个构造器
+}
+Cat cat = new Cat("miaomiao",20)
+```
+
+==static环境==
+
 
 
 
