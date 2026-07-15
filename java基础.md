@@ -315,6 +315,228 @@ Integer f = 100; │ f = 0x300│──▶│ value = 100         │
 
 迭代就是for循环
 
+
+
+### 泛型
+
+**泛型就是把类型也当作参数传递，让代码更通用且类型安全**。
+
+```
+泛型类/接口：class Box<T> { }，用<T>占位类型
+
+泛型方法：public <T> T method(T arg) { }，<T>必须写在返回值前面
+
+通配符：List<?>表示未知类型，只能读不能写（除了null）
+
+```
+
+```java
+// 1. 泛型类
+public class Box<T> {
+    private T data;
+    public T get() { return data; }
+    public void set(T data) { this.data = data; }
+}
+
+// 2. 泛型方法（注意<T>的位置）
+public static <T> T getMiddle(T... arr) {
+    return arr[arr.length / 2];
+}
+
+// 3. 使用
+Box<String> box = new Box<>();     // 尖括号里写具体类型
+String s = box.get();              // 不用强制转型
+
+// 4. 通配符（只读不写）
+public void print(List<?> list) {   // ? 表示未知类型
+    for (Object o : list) {         // 只能读成Object
+        System.out.println(o);
+    }
+}
+```
+
+### 正则表达式
+
+**正则 = 用符号代替文字，描述你想要什么样的字符串。**
+
+比如：
+
+- 你想找所有手机号 → 写规则：`1[3-9]\d{9}`
+- 你想找所有邮箱 → 写规则：`\w+@\w+\.\w+`
+- 你想判断密码是否包含字母和数字 → 写规则：`^(?=.*[A-Za-z])(?=.*\d).{8,}$`
+
+| 符号  | 意思                      | Java写法 | 匹配示例                          |
+| :---- | :------------------------ | :------- | :-------------------------------- |
+| `.`   | 任意一个字符（除换行）    | `"."`    | `a.b` 匹配 `acb`、`a1b`           |
+| `\d`  | **数字** 0-9              | `"\\d"`  | `\d{3}` 匹配 `123`                |
+| `\w`  | **字母/数字/下划线**      | `"\\w"`  | `\w+` 匹配 `hello_123`            |
+| `\s`  | **空白**（空格/Tab/换行） | `"\\s"`  | `a\sb` 匹配 `a b`                 |
+| `*`   | 前一个出现 **0次或多次**  | `"*"`    | `ab*` 匹配 `a`、`ab`、`abb`       |
+| `+`   | 前一个出现 **1次或多次**  | `"+"`    | `ab+` 匹配 `ab`、`abb`，不匹配`a` |
+| `?`   | 前一个出现 **0次或1次**   | `"?"`    | `ab?` 匹配 `a`、`ab`              |
+| `{n}` | 前一个出现 **恰好n次**    | `"{n}"`  | `\d{4}` 匹配 `2026`               |
+| `[ ]` | 集合中的**任意一个**      | `"[ ]"`  | `[aeiou]` 匹配任意元音字母        |
+| `|`   | **或**                    | `"|"`    | `a|b` 匹配 `a` 或 `b`             |
+
+### 异常
+
+```
+Throwable（祖宗）
+├── Error（严重错误，程序处理不了）
+│   └── OutOfMemoryError、StackOverflowError
+└── Exception（可控异常，程序需要处理）
+    ├── RuntimeException（运行时异常，程序员代码问题）
+    │   └── NullPointerException、ArrayIndexOutOfBoundsException
+    └── 非RuntimeException（受检异常，编译必须处理）
+        └── IOException、SQLException、ClassNotFoundException
+```
+
+**检查性异常**
+
+编译时就出现的异常，不处理无法经过编译
+
+通常由用户错误操作引起，比如打开一个不存在的文件
+
+**运行时异常**
+
+编译能通过，运行时报错
+
+通常由程序问题引起
+
+**Java 提供了以下关键字和类来支持异常处理：**
+
+- **try**：用于包裹可能会抛出异常的代码块。
+- **catch**：用于捕获异常并处理异常的代码块。
+- **finally**：用于包含无论是否发生异常都需要执行的代码块。
+- **throw**：用于手动抛出异常。
+- **throws**：用于在方法声明中指定方法可能抛出的异常。
+- **Exception**类：是所有异常类的父类，它提供了一些方法来获取异常信息，如 **getMessage()、printStackTrace()** 等。
+
+**try catch finally 结构**
+
+```
+try {
+    // ========== 这里放什么？ ==========
+    // 放"可能抛出异常"的代码
+    
+} catch (异常类型 e) {
+    // ========== 这里放什么？ ==========
+    // 放"出了异常怎么处理"的代码
+    
+} finally {
+    // ========== 这里放什么？ ==========
+    // 放"不管有没有异常都必须执行"的代码
+}
+```
+
+资源是什么？
+
+**资源就是程序需要用到的"外部东西"，用完了必须归还（释放），否则系统会卡顿甚至崩溃。**
+
+| 资源类型       | 具体例子                                            | 不释放的后果                                   |
+| :------------- | :-------------------------------------------------- | :--------------------------------------------- |
+| **文件流**     | `FileInputStream`、`FileOutputStream`、`FileReader` | 文件被占用，别人打不开；超过系统最大文件句柄数 |
+| **网络连接**   | `Socket`、`HttpURLConnection`                       | 连接数耗尽，无法建立新连接                     |
+| **数据库连接** | `Connection`、`Statement`、`ResultSet`              | 连接池耗尽，整个应用卡死                       |
+| **内存资源**   | 直接内存（`ByteBuffer.allocateDirect()`）           | 内存泄漏，OOM                                  |
+| **锁资源**     | `ReentrantLock`                                     | 死锁，线程永远等待                             |
+| **系统句柄**   | 窗口句柄、GDI对象（GUI程序）                        | 界面卡死                                       |
+
+**资源异常建议写法**
+
+```java
+// 把资源定义在try后面的括号里，自动关闭！
+try (FileInputStream fis = new FileInputStream("test.txt");
+     FileOutputStream fos = new FileOutputStream("out.txt")) {
+    
+    // 使用fis和fos...文件输入流，读取文件和文件输出流，写入文件
+    int data = fis.read();
+    fos.write(data);
+    
+} catch (IOException e) {
+    e.printStackTrace();
+    // 不用写finally！fis和fos自动关闭
+}
+```
+
+
+
+
+
+Java有内置的异常类，也可以自定义异常
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 封装，继承，多态
 
 

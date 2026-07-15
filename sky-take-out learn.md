@@ -304,6 +304,165 @@ JVM**类加载机制**
 
 实际编程中对代理对象进行编程
 
+### 实体类模块（POJO）
+
+| 概念                    | 职责                                                      | 作用范围                                | 可变性                       |
+| :---------------------- | :-------------------------------------------------------- | :-------------------------------------- | :--------------------------- |
+| **Entity（实体）**      | 映射数据库表结构，对应 `@Table`、`@Column`，包含 ORM 注解 | 持久层（DAO/Repository）                | 与数据库表强耦合，变动影响大 |
+| **DTO（数据传输对象）** | 跨层/跨服务传递数据，不包含业务逻辑                       | 接口层（Controller）、服务层（Service） | 高度可变，可自由设计字段     |
+| **VO（视图对象）**      | 为特定页面或视图定制，通常包含展示层格式化逻辑            | 展示层（如 Thymeleaf、前端）            | 通常只读，与前端视图对应     |
+
+## 自定义注解怎么写
+
+```java
+package com.sky.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import com.sky.enumeration.OperationType;
+
+/**
+ * 自动填充注解
+ */
+@Target(ElementType.METHOD)//声明注解使用的对象
+@Retention(RetentionPolicy.RUNTIME)//声明注解的存活时间
+public @interface AutoFill {//注解类型+注解名
+    OperationType value();//注解属性
+}
+
+```
+
+| 关键字       | 声明类型     | 示例                            |
+| :----------- | :----------- | :------------------------------ |
+| `class`      | 类（普通类） | `public class User {}`          |
+| `interface`  | 接口         | `public interface Animal {}`    |
+| `@interface` | **注解**     | `public @interface AutoFill {}` |
+
+#### aspect/           # AOP 切面类
+
+**`aspect/` 目录用于存放 AOP 切面类（Aspect Class），这些类集中定义了横切关注点（Cross-Cutting Concerns），比如日志、权限、性能监控、事务管理等，通过在不修改业务代码的情况下，动态增强目标方法的行为**。
+
+##### 切面类的核心概念
+
+在 Spring AOP 中，一个切面类就是一个普通的 Java 类，上面标注了 `@Aspect` 注解，并包含以下核心要素：
+
+- **切入点（Pointcut）**：定义哪些方法需要被增强（从哪里切入）。
+- **通知（Advice）**：定义增强的具体逻辑（在什么时候、做什么事），包括 `@Before`、`@After`、`@AfterReturning`、`@AfterThrowing` 和 `@Around`。
+
+简单说，切面类 = **“在哪里切入”** + **“切入后做什么”**。
+
+下面是一个完整的日志切面，用于记录 Controller 层每个接口的入参、出参和耗时。
+
+```java
+package com.example.common.aspect;
+
+import com.alibaba.fastjson.JSON;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+
+@Aspect                // 标记这个类是一个切面
+@Component             // @Component 告诉 Spring：请把这个类当作一个 Bean 对象，创建它的实例并放入 IoC 容器中统一管理。
+@Slf4j//@Slf4j 会在编译时自动在类中生成一个名为 log 的日志对象，让你可以直接使用 log.info()、log.error() 等方法打印日志。
+public class LogAspect {
+
+    /**
+     * 切入点：匹配 com.example.controller 包及其子包下所有类的所有方法
+     */
+    @Pointcut("execution(* com.example.controller..*.*(..))")
+    public void controllerMethod() {}
+
+    /**
+     * 环绕通知：在目标方法执行前后均进行增强
+     */
+    @Around("controllerMethod()")
+    public Object aroundController(ProceedingJoinPoint joinPoint) throws Throwable {
+        // 1. 获取方法签名信息
+        String className = joinPoint.getTarget().getClass().getSimpleName();
+        String methodName = joinPoint.getSignature().getName();
+        Object[] args = joinPoint.getArgs();
+        
+        // 2. 前置日志：打印入参
+        log.info("【请求接口】{}.{} 入参: {}", className, methodName, JSON.toJSONString(args));
+        
+        long startTime = System.currentTimeMillis();
+        Object result = null;
+        try {
+            // 3. 执行目标方法
+            result = joinPoint.proceed();
+            return result;
+        } finally {
+            // 4. 后置日志：打印出参和耗时（无论是否异常都会执行）
+            long costTime = System.currentTimeMillis() - startTime;
+            log.info("【响应接口】{}.{} 出参: {}, 耗时: {}ms", 
+                     className, methodName, JSON.toJSONString(result), costTime);
+        }
+    }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
