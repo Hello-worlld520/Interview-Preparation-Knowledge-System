@@ -50,6 +50,270 @@ Java面向对象的三大特性包括：**封装、继承、多态**：
 
 **单继承** 指的是：**一个类只能直接继承一个父类**。
 
+# 集合
+
+**容器（Container）** 是 Java 中用来**存储和管理一组对象**的数据结构统称。在 Java 集合框架中，容器就是各种集合类（Collection）和映射类（Map）。
+
+```
+                    ┌── Collection（存放单个元素）
+                    │      ├── List（有序、可重复）
+                    │      │    ├── ArrayList
+                    │      │    ├── LinkedList
+                    │      │    └── Vector
+                    │      ├── Set（无序、不可重复）
+                    │      │    ├── HashSet
+                    │      │    ├── LinkedHashSet
+                    │      │    └── TreeSet
+                    │      └── Queue（队列）
+                    │           └── PriorityQueue
+                    │
+Java 容器（集合框架）
+                    │
+                    └── Map（存放 Key-Value 键值对）
+                         ├── HashMap
+                         ├── LinkedHashMap
+                         ├── TreeMap
+                         ├── Hashtable
+                         └── ConcurrentHashMap
+```
+
+存单个元素和存键值对的区别
+
+### 为什么叫"容器"而不叫"数组"？
+
+|          | 数组                        | 容器（集合）                       |
+| :------- | :-------------------------- | :--------------------------------- |
+| 长度     | 固定，创建后不能变          | 动态扩容                           |
+| 存储类型 | 可以是基本类型（int）或对象 | 只能存储对象（泛型）               |
+| 操作方法 | 只有 `length` 和下标访问    | 丰富的 API（增删改查、排序、遍历） |
+| 灵活性   | 低                          | 高                                 |
+
+```
+          Iterable (接口)
+              ↓
+          Collection (接口)
+              ↓
+            List (接口) ←── 我们讨论的 List 接口
+          /     |     \
+   ArrayList  LinkedList  Vector (历史类)
+       ↓           ↓          ↓
+   (数组)      (链表)     (同步数组)
+```
+
+### List 与 Set 的核心区别
+
+|              | **List**                       | **Set**                                   |
+| :----------- | :----------------------------- | :---------------------------------------- |
+| **顺序**     | ✅ 有序（插入顺序）             | ❌ 无序（HashSet）/ 排序（TreeSet）        |
+| **重复**     | ✅ 允许重复                     | ❌ 不允许重复                              |
+| **索引**     | ✅ 有下标，支持随机访问         | ❌ 无下标                                  |
+| **判断依据** | 不判断重复，直接添加           | `hashCode()` + `equals()` / `compareTo()` |
+| **适用场景** | 存储有序列表、购物车、消息队列 | 去重、黑名单、标签集合                    |
+
+# *ArrayList*
+
+#### **底层采用数组实现**
+
+```java
+/**
+     * The array buffer into which the elements of the ArrayList are stored.
+     * The capacity of the ArrayList is the length of this array buffer. Any
+     * empty ArrayList with elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA
+     * will be expanded to DEFAULT_CAPACITY when the first element is added.
+     */
+    transient Object[] elementData; // non-private to simplify nested class access
+
+    /**
+     * The size of the ArrayList (the number of elements it contains).
+     *
+     * @serial
+     */
+    private int size;
+```
+
+**transient**
+
+`transient` 是 Java 中的一个**字段修饰符**，用于**标记某个实例变量不参与序列化**。
+
+**序列化 = 把 Java 对象「拍扁」成字节流，以便存储到文件或通过网络传输。反序列化 = 把字节流「还原」回 Java 对象。**
+
+- `Object[]` 可以存储**任何对象**（因为所有类都继承自 `Object`）。
+- 但不能存基本类型（`int`、`boolean` 等），需要包装类。
+
+**`size` 记录了 `ArrayList` 当前实际包含的元素个数。**
+
+#### **构造函数（用来初始化的）**
+
+```java
+/**
+     * Constructs an empty list with the specified initial capacity.
+     *
+     * @param  initialCapacity  the initial capacity of the list
+     * @throws IllegalArgumentException if the specified initial capacity
+     *         is negative
+     */
+    public ArrayList(int initialCapacity) {
+        if (initialCapacity > 0) {
+            this.elementData = new Object[initialCapacity];
+        } else if (initialCapacity == 0) {
+            this.elementData = EMPTY_ELEMENTDATA;
+        } else {
+            throw new IllegalArgumentException("Illegal Capacity: "+
+                                               initialCapacity);
+        }
+    }
+
+    /**
+     * Constructs an empty list with an initial capacity of ten.
+     */
+    public ArrayList() {
+        this.elementData = DEFAULTCAPACITY_EMPTY_ELEMENTDATA;
+    }
+
+    /**
+     * Constructs a list containing the elements of the specified
+     * collection, in the order they are returned by the collection's
+     * iterator.
+     *
+     * @param c the collection whose elements are to be placed into this list
+     * @throws NullPointerException if the specified collection is null
+     */
+    public ArrayList(Collection<? extends E> c) {
+        //构造方法名+参数类型
+        elementData = c.toArray();
+        if ((size = elementData.length) != 0) {
+            // c.toArray might (incorrectly) not return Object[] (see 6260652)
+            if (elementData.getClass() != Object[].class)
+                elementData = Arrays.copyOf(elementData, size, Object[].class);
+        } else {
+            // replace with empty array.
+            this.elementData = EMPTY_ELEMENTDATA;
+        }
+    }
+```
+
+在ArrayList的源码里为什么会有ArrayList方法？
+
+**因为它叫"构造方法"（Constructor），是 Java 语法规定的特殊方法，专门用于创建对象时初始化对象的状态。**
+
+#### 自动扩容
+
+```java
+/**
+     * Increases the capacity of this <tt>ArrayList</tt> instance, if
+     * necessary, to ensure that it can hold at least the number of elements
+     * specified by the minimum capacity argument.
+     *
+     * @param   minCapacity   the desired minimum capacity
+     */
+    public void ensureCapacity(int minCapacity) {
+        int minExpand = (elementData != DEFAULTCAPACITY_EMPTY_ELEMENTDATA)
+            // any size if not default element table
+            ? 0
+            // larger than default for default empty table. It's already
+            // supposed to be at default size.
+            : DEFAULT_CAPACITY;
+
+        if (minCapacity > minExpand) {
+            ensureExplicitCapacity(minCapacity);
+        }
+    }
+
+    private void ensureCapacityInternal(int minCapacity) {
+        if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
+            minCapacity = Math.max(DEFAULT_CAPACITY, minCapacity);
+        }
+
+        ensureExplicitCapacity(minCapacity);
+    }
+
+    private void ensureExplicitCapacity(int minCapacity) {
+        modCount++;
+
+        // overflow-conscious code
+        if (minCapacity - elementData.length > 0)
+            grow(minCapacity);
+    }
+
+    /**
+     * The maximum size of array to allocate.
+     * Some VMs reserve some header words in an array.
+     * Attempts to allocate larger arrays may result in
+     * OutOfMemoryError: Requested array size exceeds VM limit
+     */
+    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+
+    /**
+     * Increases the capacity to ensure that it can hold at least the
+     * number of elements specified by the minimum capacity argument.
+     *
+     * @param minCapacity the desired minimum capacity
+     */
+    private void grow(int minCapacity) {
+        // overflow-conscious code
+        int oldCapacity = elementData.length;
+        int newCapacity = oldCapacity + (oldCapacity >> 1);
+        if (newCapacity - minCapacity < 0)
+            newCapacity = minCapacity;
+        if (newCapacity - MAX_ARRAY_SIZE > 0)
+            newCapacity = hugeCapacity(minCapacity);
+        // minCapacity is usually close to size, so this is a win:
+        elementData = Arrays.copyOf(elementData, newCapacity);
+    }
+
+    private static int hugeCapacity(int minCapacity) {
+        if (minCapacity < 0) // overflow
+            throw new OutOfMemoryError();
+        return (minCapacity > MAX_ARRAY_SIZE) ?
+            Integer.MAX_VALUE :
+            MAX_ARRAY_SIZE;
+    }
+```
+
+**完整扩容流程**
+
+```
+用户调用 add()
+       ↓
+ensureCapacityInternal(size + 1)   ← 第1步：计算最小需要容量
+       ↓
+判断是否首次添加（延迟初始化）
+       ↓
+ensureExplicitCapacity(minCapacity)  ← 第2步：判断是否需要扩容
+       ↓
+if (minCapacity - elementData.length > 0)  ← 容量不够？
+       ↓ 是
+grow(minCapacity)   ← 第3步：执行扩容
+       ↓
+计算新容量 = oldCapacity + (oldCapacity >> 1)  ← 扩容 1.5 倍
+       ↓
+如果新容量还小于 minCapacity，则直接取 minCapacity
+       ↓
+Arrays.copyOf(elementData, newCapacity)  ← 创建新数组并复制
+       ↓
+返回新数组，旧数组被 GC 回收
+       ↓
+存入新元素，size++
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
