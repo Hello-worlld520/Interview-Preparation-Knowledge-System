@@ -610,6 +610,203 @@ public class PhantomReferenceDemo {
     }
 ```
 
+### addAll()批量插入一组元素
+
+```java
+/**
+ * 将指定集合中的所有元素添加到此列表的尾部。
+ * 这是 addAll 方法的便利版本，自动在列表末尾插入。
+ * 
+ * @param c 包含要添加到此列表的元素的集合
+ * @return {@code true} 如果此列表因调用而发生变化（即集合非空）
+ */
+public boolean addAll(Collection<? extends E> c) {
+    // 调用带索引的 addAll 方法，传入当前列表大小作为插入位置
+    // 因为索引等于 size，所以实际上是在列表尾部追加所有元素
+    return addAll(size, c);
+}
+
+/**
+ * 将指定集合中的所有元素插入到此列表中，从指定位置开始。
+ * 将该位置及其后续元素向右移动（索引增加）。
+ * 新元素将按照指定集合的迭代器返回的顺序出现在列表中。
+ *
+ * @param index 要插入第一个元素的索引位置
+ * @param c 包含要添加到此列表的元素的集合
+ * @return {@code true} 如果此列表因调用而发生变化
+ * @throws IndexOutOfBoundsException 如果索引超出范围 (index < 0 || index > size)
+ * @throws NullPointerException 如果指定的集合为 null
+ */
+public boolean addAll(int index, Collection<? extends E> c) {
+    // 1. 检查索引是否有效：确保 0 <= index <= size
+    checkPositionIndex(index);
+
+    // 2. 将传入的集合转换为数组
+    //    这样做有两个好处：
+    //    - 防止在遍历过程中原集合被修改（ConcurrentModificationException）
+    //    - 如果集合是链表结构，转换为数组可以提高遍历效率
+    Object[] a = c.toArray();
+    int numNew = a.length;  // 获取要插入的元素数量
+    
+    // 3. 如果集合为空，直接返回 false，表示没有变化
+    if (numNew == 0)
+        return false;
+
+    // 4. 定义两个节点引用：pred（前驱）和 succ（后继）
+    Node<E> pred, succ;
+    
+    // 5. 根据插入位置确定前驱和后继节点
+    if (index == size) {
+        // 情况1：在列表尾部插入
+        succ = null;        // 后继节点为 null（因为尾部后面没有节点）
+        pred = last;        // 前驱节点为当前的尾节点
+    } else {
+        // 情况2：在列表中间插入
+        succ = node(index); // 找到索引位置的节点作为后继节点
+        pred = succ.prev;   // 前驱节点为后继节点的前一个节点
+    }//元素编成链表后集体插入，所以只需要定位一次前驱和后继
+
+    // 6. 遍历数组，逐个创建新节点并链接到链表中
+    for (Object o : a) {
+        // 类型转换：将 Object 转为泛型类型 E
+        @SuppressWarnings("unchecked") 
+        E e = (E) o;
+        
+        // 创建新节点：前驱为 pred，元素为 e，后继为 null
+        Node<E> newNode = new Node<>(pred, e, null);
+        
+        if (pred == null) {
+            // 如果前驱为 null，说明新节点是链表头节点
+            first = newNode;
+        } else {
+            // 否则将前驱节点的 next 指向新节点
+            pred.next = newNode;
+        }
+        
+        // 更新前驱指针为新节点，为下一个元素的插入做准备
+        pred = newNode;
+    }
+
+    // 7. 连接尾部：将最后一个新节点与后继节点连接
+    if (succ == null) {
+        // 如果是在尾部插入（succ == null）
+        // 则最后一个新节点成为新的尾节点
+        last = pred;
+    } else {
+        // 如果是在中间插入，需要连接：
+        // 最后一个新节点 <-> 原来的后继节点
+        pred.next = succ;
+        succ.prev = pred;
+    }
+
+    // 8. 更新列表大小：增加 numNew 个元素
+    size += numNew;
+    
+    // 9. 增加修改计数器：用于 fail-fast 机制
+    //    当迭代器遍历时检测到 modCount 变化会抛出 ConcurrentModificationException
+    modCount++;
+    
+    // 10. 返回 true，表示列表发生了变化
+    return true;
+}
+```
+
+## linked list和队列方法什么关系？
+
+linked list是一个类，实现了很多接口，实现接口的意思就是能当这个东西用，就比如说linked list实现了queue接口，它就可以当作一个队列来使用了
+
+#### LinkedList 能当什么用？
+
+```java
+LinkedList<String> list = new LinkedList<>();
+
+// 1. 当 List 用（列表）
+List<String> asList = list;
+asList.add("A");
+asList.get(0);
+asList.set(0, "B");
+asList.remove(0);
+
+// 2. 当 Queue 用（队列 - FIFO）
+Queue<String> asQueue = list;
+asQueue.offer("A");    // 入队
+asQueue.poll();        // 出队
+asQueue.peek();        // 查看队头
+
+// 3. 当 Deque 用（双端队列）
+Deque<String> asDeque = list;
+asDeque.addFirst("A");   // 头部插入
+asDeque.addLast("B");    // 尾部插入
+asDeque.pollFirst();     // 头部移除
+asDeque.pollLast();      // 尾部移除
+
+// 4. 当 Collection 用（集合）
+Collection<String> asCollection = list;
+asCollection.add("A");
+asCollection.remove("A");
+asCollection.size();
+asCollection.isEmpty();
+
+// 5. 当 Iterable 用（可迭代）
+Iterable<String> asIterable = list;
+for (String s : asIterable) {
+    System.out.println(s);
+}
+
+// 6. 当 Object 用（所有类的父类）
+Object asObject = list;
+asObject.toString();
+asObject.hashCode();
+```
+
+```
+                    ┌─────────────────────┐
+                    │   LinkedList对象    │
+                    │   [C, A, B]         │
+                    └─────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+   作为 List 看        作为 Queue 看      作为 Deque 看
+   ┌────────────┐     ┌────────────┐     ┌────────────┐
+   │可以做的事情：│     │可以做的事情：│     │可以做的事情：│
+   │ add()      │     │ offer()    │     │ addFirst() │
+   │ get(index) │     │ poll()     │     │ addLast()  │
+   │ set(index) │     │ peek()     │     │ pollFirst()│
+   │ remove(index)│    │ remove()   │     │ pollLast() │
+   │ size()     │     │ element()  │     │ push()     │
+   └────────────┘     └────────────┘     └────────────┘
+        ↑                  ↑                  ↑
+        └──────────────────┴──────────────────┘
+                操作的都是同一个对象！
+```
+
+### linked list方法按照接口分类
+
+```
+LinkedList 方法分类：
+┌─────────────────────────────────────────────┐
+│                LinkedList                    │
+├─────────────────┬──────────────     ┬─────────────┤
+│   List 方法      │  Queue方法（队列）  │  Deque 方法 
+│                                         （双向队列）
+├─────────────────┼──────────────     ┼─────────────┤
+│ add(e)          │ offer(e)          │ addFirst    │
+│ add(index, e)   │ poll()            │ addLast     │
+│ get(index)      │ peek()            │ offerFirst  │
+│ set(index, e)   │ remove()          │ offerLast   │
+│ remove(index)   │ element()         │ pollFirst   │
+│ remove(Object)  │                   │ pollLast    │
+│ indexOf(Object) │                   │ peekFirst   │
+│ contains()      │                   │ peekLast    │
+│ size()          │                   │ removeFirst │
+│ isEmpty()       │                   │ removeLast  │
+│ clear()         │                   │ getFirst    │
+│ iterator()      │                   │ getLast     │
+│                 │                   │ push/pop    │
+└─────────────────┴──────────────┴─────────────┘
+```
+
 
 
 
