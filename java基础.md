@@ -343,8 +343,6 @@ Node<E> first = new Node<>(...); // 这行既声明了遥控器，又创建了�
 
 #### *LinkedList*底层**通过双向链表实现**
 
-==我还是不理解引用是个什么东西==
-
 ## 引用
 
 定义：**引用（Reference）是一个存储着对象内存地址的变量，它是 JVM 堆中对象的句柄（Handle），用于间接访问和操作目标对象。引用本身是类型安全的，且不参与指针算术运算。**
@@ -425,6 +423,290 @@ if (cachedObj == null) {
 ### GC
 
 **就是垃圾回收**
+
+### 弱引用
+
+**弱引用（Weak Reference）通过 `java.lang.ref.WeakReference` 类实现。被弱引用指向的对象，生命周期只持续到下一次垃圾回收发生之前。无论当前内存是否充足，只要 GC 线程开始工作，该对象就会被回收。**
+
+#### 2. 如何使用弱引用
+
+```java
+import java.lang.ref.WeakReference;
+
+public class WeakReferenceDemo {
+    public static void main(String[] args) {
+        // 1. 创建一个强引用对象
+        Object obj = new Object();
+        
+        // 2. 包装成弱引用
+        WeakReference<Object> weakRef = new WeakReference<>(obj);
+        
+        // 3. 切断强引用（关键步骤！）
+        obj = null;
+        
+        // 4. GC 前，弱引用还能拿到对象
+        System.out.println("GC前: " + weakRef.get());  // 输出: java.lang.Object@xxx
+        
+        // 5. 触发 GC
+        System.gc();
+        
+        // 6. GC 后，弱引用对象被回收
+        System.out.println("GC后: " + weakRef.get());  // 输出: null
+    }
+}
+```
+
+**关键点**：`weakRef.get()` 在 GC 后立即返回 `null`，比软引用（内存不足才收）**回收得更激进**。
+
+```java
+  // 2. 包装成弱引用
+        WeakReference<Object> weakRef = new WeakReference<>(obj);
+```
+
+**结构如下**
+
+```java
+WeakReference<Object> weakRef   =   new WeakReference<>(obj);
+│                  │       │          │                  │
+│                  │       │          │                  └── 传入被包装的对象 obj
+│                  │       │          └── 调用构造方法（泛型自动推断）
+│                  │       └── 变量名
+│                  └── 泛型类型参数（这个弱引用包装的是什么类型的对象）
+└── 类名（java.lang.ref.WeakReference）
+```
+
+**翻译成人话**：
+
+> "我创建了一个专门用来装 `Object` 类型对象的弱引用容器，这个容器叫 `weakRef`，它里面弱引用地指向了外面那个 `obj` 对象。"
+
+**	**
+
+```
+栈内存（Stack）                    堆内存（Heap）
+┌─────────────────┐               ┌─────────────────────┐
+│ obj (强引用)      │──────────────│   Object 对象本身    │
+│ 指向堆中的对象    │               │  (实际数据)          │
+├─────────────────┤               └─────────────────────┘
+│ weakRef          │                    ▲
+│ (弱引用容器)     │                    │
+└─────────────────┘                    │ 弱引用指向
+         │                              │
+         └─────── 实际上 WeakReference 内部有一个成员变量 referent，
+                 它用弱引用指向了堆中的 Object 对象
+```
+
+**关键点**：
+
+1. **`obj` 是强引用**：只要 `obj` 还在，堆里的 `Object` 对象**绝对安全**，GC 不敢动它。
+2. **`weakRef` 是弱引用容器**：它内部持有了对 `Object` 对象的**弱引用**。
+3. **此时对象有两条引用链**：
+   - 强引用链：`obj` → `Object 对象`
+   - 弱引用链：`weakRef` → `Object 对象`
+
+**最重要的一句话**：只要强引用 `obj` 还在，这个对象就不会被回收；如果 `obj = null` 了，那么对象只剩下弱引用，下次 GC 就会回收它。
+
+#### 3. 软引用 vs 弱引用（核心区别）
+
+| 对比维度     | 软引用（SoftReference）  | 弱引用（WeakReference）              |
+| :----------- | :----------------------- | :----------------------------------- |
+| **回收时机** | 内存**不足时**（OOM 前） | **下一次 GC**（无论内存是否充足）    |
+| **存活时长** | 能活到内存紧张为止       | 活不过一次 GC                        |
+| **典型用途** | 缓存（图片、大文件）     | 元数据、监听器、ThreadLocal          |
+| **适用场景** | "丢了重建代价大"         | "丢了可以随时重建，且不应该影响内存" |
+
+#### 弱引用的实际应用
+
+==ThreadLocal和WeakHashMap==
+
+### 虚引用
+
+> **虚引用（Phantom Reference）通过 `java.lang.ref.PhantomReference` 类实现。它是最弱的一种引用，** `get()` 方法永远返回 `null` **。你无法通过虚引用访问到对象本身，它存在的唯一意义是：当对象被 GC 回收后，虚引用会被放入关联的**引用队列（ReferenceQueue）**，从而通知你“这个对象已经被回收了”。**
+
+**白话版**：虚引用就像是**对象被回收时的“短信通知”**，它自己不持有对象，只负责告诉你“对象没了”。
+
+#### 2. 如何使用虚引用
+
+```java
+import java.lang.ref.PhantomReference;
+import java.lang.ref.ReferenceQueue;
+
+public class PhantomReferenceDemo {
+    public static void main(String[] args) {
+        // 1. 创建对象
+        Object obj = new Object();
+        
+        // 2. 创建引用队列（虚引用必须配合队列使用）
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        
+        // 3. 创建虚引用（注意：构造时必须传入队列）
+        PhantomReference<Object> phantomRef = new PhantomReference<>(obj, queue);
+        
+        // 4. 切断强引用
+        obj = null;
+        
+        // 5. 虚引用的 get() 永远返回 null
+        System.out.println(phantomRef.get());  // 永远输出: null
+        
+        // 6. 触发 GC
+        System.gc();
+        
+        // 7. 从队列中取出被回收的虚引用
+        // 注意：需要循环等待，或者用 queue.remove() 阻塞等待
+        Reference<?> ref = queue.poll();  // 非阻塞
+        if (ref != null) {
+            System.out.println("对象已被 GC 回收！");
+            // 在这里执行清理工作
+        }
+    }
+}
+```
+
+
+
+**关键语法点**：
+
+- **必须传入 `ReferenceQueue`**：虚引用构造时强制要求传入队列，没有例外。
+- **`get()` 永远返回 `null`**：即使对象还活着，你也拿不到它。
+
+#### 虚引用的唯一用途：资源清理
+
+==NIO==
+
+==**JVM 的 GC Roots 可达性分析算法**（怎么判定一个对象是"垃圾"）==
+
+
+
+回归linked list
+
+### getFirst(), getLast()
+
+获取第一个元素， 和获取最后一个元素:
+
+```java
+    /**
+     * Returns the first element in this list.
+     *
+     * @return the first element in this list
+     * @throws NoSuchElementException if this list is empty
+     */
+    public E getFirst() {
+        final Node<E> f = first;
+        if (f == null)
+            throw new NoSuchElementException();
+        return f.item;
+    }
+
+    /**
+     * Returns the last element in this list.
+     *
+     * @return the last element in this list
+     * @throws NoSuchElementException if this list is empty
+     */
+    public E getLast() {
+        final Node<E> l = last;
+        if (l == null)
+            throw new NoSuchElementException();
+        return l.item;
+    }
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
