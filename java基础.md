@@ -807,13 +807,90 @@ LinkedList 方法分类：
 └─────────────────┴──────────────┴─────────────┘
 ```
 
+==好像只看了实现原理没看怎么使用，挠头==
 
+==了解他们的原理是什么，所以特性是什么，分析我的场景需求是什么，然后匹配，选择合适的那个应用==
 
+# **ArrayDeque **
 
+**动态循环数组实现的双端队列**
 
+既能当栈用又能当队列用
 
+# PriorityQueue
 
+**基于完全二叉树实现的小顶堆的优先队列，每次都取出权值最小的那个，底层使用数组实现**
 
+父子节点编号关系
+
+```java
+leftNo = parentNo*2+1
+rightNo = parentNo*2+2
+parentNo = (nodeNo-1)/2
+```
+
+### remove()和poll()
+
+获取并删除队首元素，区别是当方法失败时前者抛出异常，后者返回`null`
+
+**删除元素代码实现**
+
+```java
+public E poll() {
+    if (size == 0)
+        return null;
+    int s = --size;
+    modCount++;
+    E result = (E) queue[0];//0下标处的那个元素就是最小的那个
+    E x = (E) queue[s];
+    queue[s] = null;
+    if (s != 0)
+        siftDown(0, x);//调整
+    return result;
+}
+//1 拿走最小的
+//2 把最后一个元素放到堆顶
+//3 下沉调整
+```
+
+### add()和offer()
+
+向优先队列中插入元素，只是`Queue`接口规定二者对插入失败时的处理不同，前者在插入失败时抛出异常，后则则会返回`false`
+
+```java
+//offer(E e)
+public boolean offer(E e) {
+    if (e == null)//不允许放入null元素
+        throw new NullPointerException();
+    modCount++;
+    int i = size;
+    if (i >= queue.length)
+        grow(i + 1);//自动扩容
+    size = i + 1;
+    if (i == 0)//队列原来为空，这是插入的第一个元素
+        queue[0] = e;
+    else
+        siftUp(i, e);//调整
+    return true;
+}
+
+```
+
+### remove(Object o)
+
+删除队列中跟`o`相等的某一个元素(如果有多个相等，只删除一个)
+
+具体来说，`remove(Object o)`可以分为2种情况: 1. 删除的是最后一个元素。直接删除即可，不需要调整。2. 删除的不是最后一个元素，从删除点开始以最后一个元素为参照调用一次`siftDown()`即可。
+
+==一个方法，应该掌握用法和原理==
+
+# HashMap
+
+`HashMap` 的底层实现是 **基于哈希表的 `Map` 接口实现**，在 Java 8 及以后版本中，其数据结构为 **数组 + 链表 + 红黑树** 的组合。它通过 **哈希函数** 将键映射到数组的某个桶（Bucket）上，并使用 **链地址法** 来处理哈希冲突。
+
+**桶是什么？**
+
+在 `HashMap` 等基于哈希表的数据结构中，**桶（Bucket）** 是**哈希表主干数组 `table` 中的一个存储槽位（Slot）**。它是数据存储的基本单元，用于存放一个或多个键值对（Key-Value Pair）节点。
 
 
 
