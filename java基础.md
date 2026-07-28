@@ -514,6 +514,12 @@ WeakReference<Object> weakRef   =   new WeakReference<>(obj);
 | **典型用途** | 缓存（图片、大文件）     | 元数据、监听器、ThreadLocal          |
 | **适用场景** | "丢了重建代价大"         | "丢了可以随时重建，且不应该影响内存" |
 
+**缓存应该用软引用还是弱引用？**
+
+答案是看情况
+
+![image-20260728161137128](java基础.assets/image-20260728161137128.png)
+
 #### 弱引用的实际应用
 
 ==ThreadLocal和WeakHashMap==
@@ -1094,9 +1100,152 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 
 *HashSet*是对*HashMap*的简单包装，对*HashSet*的函数调用都会转换成合适的*HashMap*方法
 
+# LinkedHashSet&Map
+
+事实上*LinkedHashMap*是*HashMap*的直接子类，**二者唯一的区别是\*LinkedHashMap\*在\*HashMap\*的基础上，采用双向链表(doubly-linked list)的形式将所有`entry`连接起来，这样是为保证元素的迭代顺序跟插入顺序相同**。
+
+除了可以保迭代历顺序，这种结构还有一个好处 : **迭代\*LinkedHashMap\*时不需要像\*HashMap\*那样遍历整个`table`，而只需要直接遍历`header`指向的双向链表即可**，也就是说*LinkedHashMap*的迭代时间就只跟`entry`的个数相关，而跟`table`的大小无关。
+
+**table是什么，entry是什么，table是什么，bucket是什么？**
+
+**`Entry` 是一组键值对，`Node` 是它的具体实现，而 `table` 是存放这些 `Node` 对象的数组。把 table 数组想象成一个一排的储物柜，那么其中的每一个格子，就是一个 bucket（桶）**
+
+![LinkedHashMap_base.png](https://pdai.tech/images/collection/LinkedHashMap_base.png)
+
+### put()
+
+`put(K key, V value)`方法是将指定的`key, value`对添加到`map`里。该方法首先会对`map`做一次查找，看是否包含该元组，如果已经包含则直接返回，查找过程类似于`get()`方法；如果没有找到，则会通过`addEntry(int hash, K key, V value, int bucketIndex)`方法插入新的`entry`。
+
+注意，这里的**插入有两重含义**:
+
+> 1. 从`table`的角度看，新的`entry`需要插入到对应的`bucket`里，当有哈希冲突时，采用头插法将新的`entry`插入到冲突链表的头部。
+> 2. 从`header`的角度看，新的`entry`需要插入到双向链表的尾部。
+
+就是要插入两个链表
+
+代码实现
+
+```java
+// LinkedHashMap.addEntry()
+void addEntry(int hash, K key, V value, int bucketIndex) {
+    if ((size >= threshold) && (null != table[bucketIndex])) {
+        resize(2 * table.length);// 自动扩容，并重新哈希
+        hash = (null != key) ? hash(key) : 0;
+        bucketIndex = hash & (table.length-1);// hash%table.length
+    }
+    // 1.在冲突链表头部插入新的entry
+    HashMap.Entry<K,V> old = table[bucketIndex];
+    Entry<K,V> e = new Entry<>(hash, key, value, old);
+    table[bucketIndex] = e;
+    // 2.在双向链表的尾部插入新的entry
+    e.addBefore(header);
+    size++;
+}
+```
+
+同时要注意，删除时也要删除该元素在两个链表中的位置
+
+### LinkedHashMap经典用法
+
+*LinkedHashMap*除了可以保证迭代顺序外，还有一个非常有用的用法: 可以轻松实现一个采用了FIFO替换策略的缓存。具体说来，LinkedHashMap有一个子类方法`protected boolean removeEldestEntry(Map.Entry<K,V> eldest)`，该方法的作用是告诉Map是否要删除“最老”的Entry，所谓最老就是当前Map中最早插入的Entry，如果该方法返回`true`，最老的那个元素就会被删除。在每次插入新元素的之后LinkedHashMap会自动询问removeEldestEntry()是否要删除最老的元素。这样只需要在子类中重载该方法，当元素个数超过一定数量时让removeEldestEntry()返回true，就能够实现一个固定大小的FIFO策略的缓存。示例代码如下:
+
+```java
+/** 一个固定大小的FIFO替换策略的缓存 */
+class FIFOCache<K, V> extends LinkedHashMap<K, V>{
+    private final int cacheSize;
+    public FIFOCache(int cacheSize){
+        this.cacheSize = cacheSize;
+    }
+
+    // 当Entry个数超过cacheSize时，删除最老的Entry
+    @Override
+    protected boolean removeEldestEntry(Map.Entry<K,V> eldest) {
+       return size() > cacheSize;
+    }
+}
+```
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# TreeMap
+
+### 键值对+排序= **`TreeMap`**
+
+**TreeMap 是基于红黑树（Red-Black Tree）实现的键值对集合，所有 key 按照自然顺序或你指定的规则自动排序。**
+
+| 缺点                  | 说明                                                         |
+| :-------------------- | :----------------------------------------------------------- |
+| **性能比 HashMap 慢** | O(log n) vs O(1)，数据量很大时差距明显                       |
+| **key 不能为 null**   | 因为要比较排序，`null` 没法比较，会抛 `NullPointerException` |
+| **不保证线程安全**    | 和多线程的 HashMap 一样，需要用 `Collections.synchronizedSortedMap` 包装 |
+
+在数据结构里写的比较细，看数据结构去
+
+## TreeSet
+
+前面已经说过`TreeSet`是对`TreeMap`的简单包装，对`TreeSet`的函数调用都会转换成合适的`TreeMap`方法
+
+## WeakHashMap
+
+结构和hashmap一样，就是采用了弱引用，适用于缓存
 
 
 
