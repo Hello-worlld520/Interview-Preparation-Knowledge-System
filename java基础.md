@@ -73,11 +73,15 @@ Java 容器（集合框架）
                          ├── HashMap
                          ├── LinkedHashMap
                          ├── TreeMap
-                         ├── Hashtable
+                         ├── WeakHashMap
                          └── ConcurrentHashMap
 ```
 
 存单个元素和存键值对的区别
+
+**为什么集合里面没有栈？**
+
+原先有专门的一个类，后来out了，现代 Java 推荐使用 `Deque`（双端队列）接口及其实现类（如 `ArrayDeque`）来作为栈的替代品。
 
 ### 为什么叫"容器"而不叫"数组"？
 
@@ -1165,66 +1169,6 @@ class FIFOCache<K, V> extends LinkedHashMap<K, V>{
 }
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # TreeMap
 
 ### 键值对+排序= **`TreeMap`**
@@ -1247,11 +1191,37 @@ class FIFOCache<K, V> extends LinkedHashMap<K, V>{
 
 结构和hashmap一样，就是采用了弱引用，适用于缓存
 
+## ConcurrentHashMap
 
+和 `HashMap` 一样，**`ConcurrentHashMap` 也是一个具体的类（Class）**，它直接实现了 `ConcurrentMap` 接口
 
+适用于高并发环境且线程安全
 
+# ==队列==（单拎出来讲一下）
 
+```
+java.util.Collection (接口)
+    │
+    └── java.util.Queue (接口)            // 队列的根接口
+            │
+            ├── java.util.Deque (接口)     // 双端队列，支持两端操作
+            │       │
+            │       ├── ArrayDeque (类)    // 基于循环数组，性能极佳
+            │       └── LinkedList (类)    // 基于链表，也实现了List
+            │
+            ├── java.util.concurrent.BlockingQueue (接口) // 阻塞队列，支持等待
+            │       │
+            │       ├── ArrayBlockingQueue (类)   // 有界，数组实现
+            │       ├── LinkedBlockingQueue (类)  // 可有界/无界，链表实现
+            │       ├── PriorityBlockingQueue (类)// 无界，优先级排序
+            │       └── DelayQueue (类)           // 延迟出队
+            │
+            └── PriorityQueue (类)         // 优先级队列，按顺序出队
+```
 
+Java队列主要分为三个分支：**普通队列**、**双端队列**和**阻塞队列**。
+
+==队列整体结构不清楚==
 
 
 
