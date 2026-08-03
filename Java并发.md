@@ -332,3 +332,159 @@ Java对象线程安全程度（从高到低）
 ### [#](#死亡-terminated) 死亡(Terminated)
 
 可以是线程结束任务之后自己结束，或者产生了异常而结束
+
+## 线程使用方式
+
+有三种使用线程的方法:
+
+- 实现 Runnable 接口；
+- 实现 Callable 接口；
+- 继承 Thread 类。
+
+实现 Runnable 和 Callable 接口的类只能当做一个可以在线程中运行的任务，不是真正意义上的线程，因此最后还需要通过 Thread 来调用。可以说任务是通过线程驱动从而执行的。
+
+## Executor框架
+
+### ![image-20260803090329947](Java并发.assets/image-20260803090329947.png)
+
+### Executor（基础接口）
+
+**定义**：只有一个方法的顶层接口。
+
+```java
+public interface Executor {
+    void execute(Runnable command);
+}
+```
+
+### ExecutorService（增强接口）
+
+**定义**：继承 `Executor`，增加了生命周期管理和异步结果获取能力。
+
+```java
+public interface ExecutorService extends Executor {
+    // 生命周期管理
+    void shutdown();                    // 温柔关闭（等待已有任务完成）
+    List<Runnable> shutdownNow();       // 立即关闭（中断正在执行的任务）
+    boolean isShutdown();               // 是否已关闭
+    boolean isTerminated();             // 是否所有任务已完成
+    boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+
+    // 异步结果获取
+    <T> Future<T> submit(Callable<T> task);      // 提交有返回值的任务
+    <T> Future<T> submit(Runnable task, T result);
+    Future<?> submit(Runnable task);
+
+    // 批量执行
+    <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException;
+    <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException;
+}
+```
+
+## Submit方法3. submit()方法
+
+ExecutorService 接口定义了 submit()方法的3个重载。
+
+```java
+// 1. 提交Callable任务
+<T> Future<T> submit(Callable<T> task);
+
+// 2. 提交Runnable任务
+Future<?> submit(Runnable task);
+
+// 3. 提交Runnable任务并预设返回值
+<T> Future<T> submit(Runnable task, T result);
+```
+
+
+
+## ThreadPoolExecutor 创建线程池
+
+ThreadPoolExecutor是具体实现类，ExecutorService是接口
+
+ThreadPoolExecutor的构造方法
+
+```java
+new ThreadPoolExecutor(
+    int corePoolSize,    // 核心线程数（全职客服，核心线程数>=0）
+    int maxPoolSize,    // 最大线程数（全职客服+临时客服，最大线程数>=1）
+    long keepAliveTime,    // 非核心线程空闲存活时间（临时客服的解约条件）
+    TimeUnit unit,    // 时间单位（例如TimeUnit.SECONDS）
+    BlockingQueue<Runnable> workQueue,    // 任务队列（坐席忙，请等待）
+    ThreadFactory threadFactory,    // 线程工厂
+    RejectedExecutionHandler handler    // 拒绝策略（坐席全忙，请稍后再投）
+);
+```
+
+## 自定义线程工厂
+
+```java
+/**
+ * 自定义线程工厂
+ */
+public class MyThreadFactory implements ThreadFactory {
+    @Override
+    public Thread newThread(Runnable r) {
+        Thread thread = new Thread(r);
+        // 设置守护线程
+        thread.setDaemon(true);
+        // 设置线程名字
+        thread.setName("线程_" + thread.getId());
+        return thread;
+    }
+}
+```
+
+## 拒绝策略的激发条件
+
+```
+                    触发拒绝策略
+                          ▲
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+         线程数达到               队列已满
+     maximumPoolSize            (workQueue)
+              │                       │
+              └───────────┬───────────┘
+                          │
+                   两个条件缺一不可
+```
+
+## Future 接口 
+
+`Future` = 一张“取货凭证”，代表一个异步任务的执行状态和结果。拿着它，你可以查进度、拿结果、取消任务。
+
+接口定义：
+
+```java
+public interface Future<V> {
+    // 取消任务
+    boolean cancel(boolean mayInterruptIfRunning);
+    
+    // 是否已取消
+    boolean isCancelled();
+    
+    // 是否已完成（正常完成/异常/取消都算完成）
+    boolean isDone();
+    
+    // 阻塞等待，获取结果
+    V get() throws InterruptedException, ExecutionException;
+    
+    // 阻塞等待，超时则抛出 TimeoutException
+    V get(long timeout, TimeUnit unit)
+        throws InterruptedException, ExecutionException, TimeoutException;
+}
+```
+
+### future接口的get（）方法
+
+```java
+// 版本1：无限等待，任务被取消引发CancellationException
+V get() throws InterruptedException, ExecutionException;
+
+// 版本2：限时等待，超时会引发TimeoutException
+V get(long timeout, TimeUnit unit) throws InterruptedException,
+    ExecutionException, TimeoutException;
+```
+
