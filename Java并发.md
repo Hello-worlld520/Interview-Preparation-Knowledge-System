@@ -437,6 +437,36 @@ public class MyThreadFactory implements ThreadFactory {
 
 ## 拒绝策略的激发条件
 
+### 核心接口：RejectedExecutionHandler
+
+```java
+public interface RejectedExecutionHandler {
+    void rejectedExecution(Runnable r, ThreadPoolExecutor executor);
+}                          //被拒绝的任务，任务所在的线程池
+```
+
+### 拒绝策略
+
+可以实现这个接口自定义拒绝策略，也可以选择JDK提供的四种已有拒绝策略
+
+* ### AbortPolicy（中止策略）默认策略
+
+​       中断任务提交并抛出异常
+
+* ### CallerRunsPolicy（调用者运行策略）
+
+  将任务退回给提交者，由提交任务的线程亲自执行该任务
+
+* ### DiscardPolicy（丢弃策略）
+
+  什么都不做，只是静默地丢弃被拒绝的任务。方法体为空 `{}`。
+
+* ###  DiscardOldestPolicy（丢弃最老策略）
+
+​       队列中最早的任务（队列的头部任务）被丢弃，新任务进入队列
+
+
+
 ```
                     触发拒绝策略
                           ▲
@@ -488,3 +518,90 @@ V get(long timeout, TimeUnit unit) throws InterruptedException,
     ExecutionException, TimeoutException;
 ```
 
+# 线程池的生命周期和池的关闭
+
+```java
+RUNNING: 运行中。特点：接收新任务 + 执行队列中的任务。类似餐厅的正常营业时段。
+
+SHUTDOWN: 关闭中（优雅关闭）。特点：拒绝新任务 + 继续执行队列中的任务。类似餐厅打烊时段，停止接单但做完已接订单。
+
+STOP: 强制关闭。特点：拒绝新任务 + 中断执行中的任务。类似餐厅紧急闭店清场。
+
+TIDYING: 过渡。特点：所有任务已终止 + 线程池线程数为0。类似餐厅清扫后厨、结算。
+
+TERMINATED: 终止。特点：线程池彻底销毁。类似餐厅熄灯闭店。
+```
+
+**shutdown（）优雅关闭**
+
+拒绝新任务，继续执行队列中的任务
+
+关闭后再提交新任务会提交异常
+
+**shutdownNow( )立即关闭**
+
+拒绝新任务，丢弃队列中的任务，中断正在执行中的任务
+
+关闭后再提交新任务会引发异常
+
+**返回值:**会返回未执行的任务列表，返回队列中尚未执行的所有任务，已执行或正在执行的任务不包含在内
+
+**超时关闭函数**
+
+**awaitTermination()**
+
+**标准超时流程**
+
+```
+调用 shutdown()
+       │
+       ▼
+调用 awaitTermination(超时)
+       │
+       ├─── 超时前终止 ───> 返回 true (优雅关闭成功)
+       │
+       └─── 超时 ───> 返回 false
+              │
+              ▼
+       调用 shutdownNow()
+              │
+              ▼
+       再次 awaitTermination(短超时)
+              │
+              ├─── 成功 ───> 关闭完成
+              │
+              └─── 失败 ───> 记录错误日志
+```
+
+# 批量任务
+
+批量任务是指**一次性提交多个相似任务**的场景，常见于：
+
+| 场景           | 示例                        |
+| :------------- | :-------------------------- |
+| 批量数据处理   | 导入10万条Excel数据         |
+| 批量消息推送   | 给100万用户发送通知         |
+| 批量文件处理   | 处理1000个图片文件          |
+| 批量数据库操作 | 批量插入/更新数万条记录     |
+| 批量API调用    | 调用第三方接口获取1万条数据 |
+
+### 批量提交任务的四种方式
+
+* 循环提交
+
+* ####  invokeAll() 
+
+  ```java
+  
+  // 版本1：不限制处理时间
+  <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+      throws InterruptedException;
+  
+  // 版本2：限时处理
+  <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                long timeout, 
+                                TimeUnit unit)
+      throws InterruptedException;
+  ```
+
+  
