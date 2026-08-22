@@ -668,7 +668,7 @@ while True:
                 except Exception as tool_error:
                     result = f"工具执行失败：{str(tool_error)}"
                     print(f"工具执行出错：{tool_error}")
-# Python 在执行代码时，如果遇到问题，会自动创建一个对应的异常对象，并"抛"出来。这里被放到了tool_error里被打印出来，就可以在控制台看到出错yuan
+# Python 在执行代码时，如果遇到问题，会自动创建一个对应的异常对象，并"抛"出来。这里被放到了tool_error里被打印出来，就可以在控制台看到出错原因了
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
@@ -786,7 +786,7 @@ while True:
         ├── 2.3.5 异常捕获 (外层 except)
         │   ├── print(f"出错了：{e}")
         │   └── break
-        │
+        │# 外层 except 捕获的是：调用 AI API 时可能出现的网络/服务错误。
         └── 2.3.6 步数限制检查
             └── if step >= MAX_STEPS and not assistant_message.tool_calls:
                 ├── print("警告：已达到最大执行步数，强制退出")
@@ -821,3 +821,121 @@ while True:
 
 * raise就是不处理异常，向上层汇报
 * raise代码执行了，同层的后面的代码就不会执行了
+
+# 7 **参数tool choice**
+
+**tool_choice有哪些**：
+
+| 写法                                              | 效果                                   |
+| ------------------------------------------------- | -------------------------------------- |
+| `tool_choice="auto"`                              | 模型自己决定是否调用、调用哪些（默认） |
+| `tool_choice="required"`                          | 必须调用至少一个工具                   |
+| `tool_choice="none"`                              | 禁止调用任何工具                       |
+| `tool_choice={"type": "function", "name": "xxx"}` | 强制调用某一个函数                     |
+| `tool_choice={"type": "allowed_tools", ...}`      | 只允许调用指定子集                     |
+
+### tool_choice是什么？写在哪里？
+
+tool_choice 是 AI API 中的一个参数，用来控制 AI 是否调用工具以及如何调用工具
+
+* #### 每一轮都用同一个 tool_choice
+
+只需要在循环里的 create() 加上 tool_choice 即可，其他地方不用动。
+
+```python
+while turn < max_turns:
+    turn += 1
+
+    response = client.responses.create(
+        model="gpt-5.6",
+        tools=tools,
+        input=input_list,
+
+        # ========== 加在这里 ==========
+        tool_choice={
+            "type": "allowed_tools",
+            "mode": "auto",
+            "tools": [
+                {"type": "function", "name": "get_horoscope"}
+            ]
+        },
+        # ==============================
+    )
+
+    input_list += response.output
+
+    function_calls = [
+        item for item in response.output
+        if getattr(item, "type", None) == "function_call"
+    ]
+
+    if not function_calls:
+        print("最终回答：")
+        print(response.output_text)
+        break
+
+    # 执行工具、追加结果……（这部分完全不用改）
+    for item in function_calls:
+        ...
+```
+
+**改动点只有一处**：在 create() 里加上 tool_choice=...。
+
+* ### 根据轮次动态改变 tool_choice
+
+**第 1 轮**：强制必须调用工具（用 required 或 allowed_tools + required）
+
+**后面几轮**：让模型自己决定，或者禁止再调工具
+
+```python
+while turn < max_turns:
+    turn += 1
+
+    # ========== 根据轮次决定 tool_choice ==========
+    if turn == 1:
+        # 第一轮：强制只能用 get_horoscope，而且必须调用
+        current_tool_choice = {
+            "type": "allowed_tools",
+            "mode": "required",
+            "tools": [
+                {"type": "function", "name": "get_horoscope"}
+            ]
+        }
+    else:
+        # 后面几轮：让模型自己决定（也可以改成 "none" 禁止再调工具）
+        current_tool_choice = "auto"
+    # =============================================
+
+    response = client.responses.create(
+        model="gpt-5.6",
+        tools=tools,
+        input=input_list,
+        tool_choice=current_tool_choice,   # 用上面算出来的
+    )
+
+    input_list += response.output
+
+    function_calls = [
+        item for item in response.output
+        if getattr(item, "type", None) == "function_call"
+    ]
+
+    if not function_calls:
+        print("最终回答：")
+        print(response.output_text)
+        break
+
+    # 执行工具（这里完全不用改）
+    for item in function_calls:
+        name = item.name
+        args = json.loads(item.arguments)
+        call_id = item.call_id
+
+        result = tool_map[name](**args)
+
+        input_list.append({
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": str(result),
+        })
+```
