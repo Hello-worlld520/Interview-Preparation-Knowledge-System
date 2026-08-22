@@ -597,5 +597,227 @@ else:
     answer = message.content
 ```
 
+# 6 给 agent loop 加最大步数、超时和错误处理
 
+**为什么要这么干？**
 
+Agent本质上是自主决策，自动执行的程序，没有限制容易死循环
+
+```python
+import time
+
+MAX_STEPS = 5
+TIMEOUT = 30
+
+print("开始对话（输入 exit 退出）\n")
+
+while True:
+    user_input = input("你: ").strip()
+    if user_input.lower() in {"exit", "quit", "退出"}:
+        print("对话结束")
+        break
+
+    messages.append({"role": "user", "content": user_input})
+
+    # ===== Agent Loop =====
+    step = 0
+    start_time = time.time()
+    
+    while step < MAX_STEPS:
+        step += 1
+        print(f"--- 第 {step} 步 ---")
+        
+        # ✅ 超时检查
+        if time.time() - start_time > TIMEOUT:
+            print("错误：执行超时，强制退出")
+            final_reply = "抱歉，执行超时了，请简化问题重试。"
+            break
+
+        try:
+            response = client.chat.completions.create(
+                model="mimo-v2.5-pro",
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.3
+            )
+
+            assistant_message = response.choices[0].message
+            messages.append(assistant_message)
+
+            # 没有工具调用 → 结束循环
+            if not assistant_message.tool_calls:
+                print(f"AI: {assistant_message.content}\n")
+                break
+
+            # 有工具调用 → 执行工具
+            for tool_call in assistant_message.tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+
+                # ✅ 工具执行错误处理
+                try:
+                    if function_name == "get_weather":
+                        city = function_args.get("city")
+                        result = get_weather(city)
+                    elif function_name == "read_file":
+                        file_path = function_args.get("file_path")
+                        result = read_file(file_path)
+                    else:
+                        result = f"未知工具：{function_name}"
+                except Exception as tool_error:
+                    result = f"工具执行失败：{str(tool_error)}"
+                    print(f"工具执行出错：{tool_error}")
+# Python 在执行代码时，如果遇到问题，会自动创建一个对应的异常对象，并"抛"出来。这里被放到了tool_error里被打印出来，就可以在控制台看到出错yuan
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result
+                })
+
+            # 把工具结果再发给 AI（如果有工具调用）
+            second_response = client.chat.completions.create(
+                model="mimo-v2.5-pro",
+                messages=messages,
+                temperature=0.3
+            )
+            final_reply = second_response.choices[0].message.content
+            print(f"AI: {final_reply}\n")
+            messages.append({"role": "assistant", "content": final_reply})
+
+        except Exception as e:
+            print(f"出错了：{e}")
+            break
+    
+    # ✅ 检查是否因步数限制退出
+    if step >= MAX_STEPS and not assistant_message.tool_calls:
+        print("警告：已达到最大执行步数，强制退出")
+        messages.append({"role": "assistant", "content": "抱歉，处理步骤过多，请简化问题重试。"})
+        
+        
+程序执行流程
+│
+├── 1. 环境初始化
+│   ├── import time
+│   ├── 设置常量：MAX_STEPS = 5, TIMEOUT = 30
+│   └── 打印欢迎语
+│
+└── 2. 对话循环 (while True)
+    │
+    ├── 2.1 获取用户输入
+    │   ├── user_input = input("你: ").strip()
+    │   └── 判断退出条件 → break
+    │
+    ├── 2.2 加入聊天记录
+    │   └── messages.append({"role": "user", "content": user_input})
+    │
+    └── 2.3 Agent Loop (while step < MAX_STEPS)
+        │
+        ├── 2.3.1 步数计数
+        │   ├── step += 1
+        │   └── print(f"--- 第 {step} 步 ---")
+        │
+        ├── 2.3.2 超时检查
+        │   └── if time.time() - start_time > TIMEOUT:
+        │       ├── print("错误：执行超时，强制退出")
+        │       ├── final_reply = "抱歉，执行超时了..."
+        │       └── break
+        │
+        ├── 2.3.3 调用 AI（外层 try）
+        │   │
+        │   ├── response = client.chat.completions.create(
+        │   │   ├── model: "mimo-v2.5-pro"
+        │   │   ├── messages: messages
+        │   │   ├── tools: tools
+        │   │   ├── tool_choice: "auto"
+        │   │   └── temperature: 0.3
+        │   │   )
+        │   │
+        │   ├── assistant_message = response.choices[0].message
+        │   └── messages.append(assistant_message)
+        │
+        ├── 2.3.4 判断是否有工具调用
+        │   │
+        │   ├── 情况A：没有工具调用
+        │   │   ├── print(f"AI: {assistant_message.content}\n")
+        │   │   └── break (结束 Agent Loop)
+        │   │
+        │   └── 情况B：有工具调用
+        │       │
+        │       ├── 遍历所有 tool_calls
+        │       │   for tool_call in assistant_message.tool_calls:
+        │       │       ├── function_name = tool_call.function.name
+        │       │       └── function_args = json.loads(tool_call.function.arguments)
+        │       │
+        │       ├── 执行工具（内层 try）
+        │       │   │
+        │       │   ├── 路由判断
+        │       │   │   ├── if function_name == "get_weather":
+        │       │   │   │   └── result = get_weather(city)
+        │       │   │   ├── elif function_name == "read_file":
+        │       │   │   │   └── result = read_file(file_path)
+        │       │   │   └── else:
+        │       │   │       └── result = f"未知工具：{function_name}"
+        │       │   │
+        │       │   └── 异常捕获
+        │       │       └── except Exception as tool_error:
+        │       │           ├── result = f"工具执行失败：{str(tool_error)}"
+        │       │           └── print(f"工具执行出错：{tool_error}")
+        │       │
+        │       ├── 构造 Tool 消息
+        │       │   └── messages.append({
+        │       │       ├── role: "tool"
+        │       │       ├── tool_call_id: tool_call.id
+        │       │       └── content: result
+        │       │       })
+        │       │
+        │       ├── 第二次调用 AI
+        │       │   ├── second_response = client.chat.completions.create(
+        │       │   │   ├── model: "mimo-v2.5-pro"
+        │       │   │   ├── messages: messages
+        │       │   │   └── temperature: 0.3
+        │       │   │   )
+        │       │   ├── final_reply = second_response.choices[0].message.content
+        │       │   ├── print(f"AI: {final_reply}\n")
+        │       │   └── messages.append({"role": "assistant", "content": final_reply})
+        │       │
+        │       └── 回到 Agent Loop 开头（继续下一步）
+        │
+        ├── 2.3.5 异常捕获 (外层 except)
+        │   ├── print(f"出错了：{e}")
+        │   └── break
+        │
+        └── 2.3.6 步数限制检查
+            └── if step >= MAX_STEPS and not assistant_message.tool_calls:
+                ├── print("警告：已达到最大执行步数，强制退出")
+                └── messages.append({"role": "assistant", "content": "抱歉，处理步骤过多..."})
+```
+
+## 两种循环的关系
+
+```
+对话循环 (while True)
+    │
+    ├── 用户第1次输入
+    │   └── Agent Loop (最多5步)
+    │       ├── 第1步 → 有工具调用 → 继续
+    │       ├── 第2步 → 有工具调用 → 继续
+    │       └── 第3步 → 无工具调用 → 结束
+    │
+    ├── 用户第2次输入
+    │   └── Agent Loop (最多5步)
+    │       ├── 第1步 → 无工具调用 → 结束
+    │
+    └── 用户第3次输入 → 退出
+```
+
+### 最大步数是调用工具的次数，不是对话次数
+
+### 关于错误处理
+
+* try  ... except ...就是尝试执行这个函数，如果失败怎么怎么样
+
+这样处理之后不会影响主体代码的执行，还可以将报错信息直接喂回给AI，让AI来处理异常情况
+
+* raise就是不处理异常，向上层汇报
+* raise代码执行了，同层的后面的代码就不会执行了
