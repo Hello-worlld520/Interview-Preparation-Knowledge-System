@@ -542,6 +542,75 @@ JavaEE三层架构：
 
 解决方式：把这些东西都写到配置文件里，用到的时候读取配置文件
 
+```
+📦 MyBatis 使用方法
+│
+├── 1️⃣ 引入依赖
+│   ├── Maven 项目 → pom.xml 添加
+│   │   ├── mybatis 核心包
+│   │   └── 数据库驱动（如 mysql-connector-java）
+│   └── Spring Boot 项目 → 用 mybatis-spring-boot-starter
+│
+├── 2️⃣ 配置 MyBatis
+│   ├── 方式一：XML 配置文件（原生 MyBatis）
+│   │   ├── mybatis-config.xml
+│   │   │   ├── environments（环境配置）
+│   │   │   │   ├── transactionManager（事务管理）
+│   │   │   │   └── dataSource（数据源：驱动、URL、账号密码）
+│   │   │   └── mappers（注册 Mapper XML 路径）
+│   │   └── 适用：非 Spring 项目
+│   │
+│   └── 方式二：Spring Boot 配置文件（推荐）
+│       ├── application.yml 或 application.properties
+│       │   ├── spring.datasource（数据源配置）
+│       │   └── mybatis（专属配置）
+│       │       ├── mapper-locations（XML 文件位置）
+│       │       ├── type-aliases-package（实体类包路径）
+│       │       └── configuration.map-underscore-to-camel-case（下划线转驼峰）
+│       └── 适用：Spring Boot 项目
+│
+├── 3️⃣ 创建实体类（对应数据库表）
+│   ├── 类名 = 表名（驼峰命名，如 User → user 表）
+│   ├── 属性 = 字段（如 id, name, age）
+│   ├── 必须有无参构造方法
+│   ├── 必须有 getter / setter
+│   └── 可选：toString() 方便调试
+│
+├── 4️⃣ 写 Mapper 接口（声明方法）
+│   ├── 位置：com.xxx.mapper 包下
+│   ├── 内容：只定义方法签名
+│   │   ├── 方法名 = XML 里的 id
+│   │   ├── 参数：用 @Param 注解命名（多参数时必须）
+│   │   └── 返回值：实体类 或 List<实体类>
+│   └── 特点：只有声明，没有实现（MyBatis 自动生成代理）
+│
+├── 5️⃣ 写 Mapper XML（写 SQL）
+
+├── 6️⃣ 使用 MyBatis（调用）
+│   ├── 方式一：原生 MyBatis（无 Spring）
+│   │   ├── 加载配置文件（Resources.getResourceAsStream）
+│   │   ├── 构建 SqlSessionFactory（SqlSessionFactoryBuilder）
+│   │   ├── 打开 SqlSession（factory.openSession）
+│   │   ├── 获取 Mapper（session.getMapper）
+│   │   ├── 调用方法
+│   │   └── 提交事务（session.commit）→ 增删改必须
+│   │
+│   └── 方式二：Spring Boot 整合（推荐）
+│       ├── Service 层 @Autowired 注入 Mapper
+│       ├── 直接调用 Mapper 方法
+│       ├── 事务管理：@Transactional 注解
+│       └── Controller 层调用 Service
+│
+└── ⚠️ 常见坑（排错指南）
+    ├── Invalid bound statement → namespace 或 id 不匹配
+    ├── 查询结果全 null → 字段名和属性名不一致（开驼峰或用 resultMap）
+    ├── 插入后 ID 为 null → 忘记配置 useGeneratedKeys / keyProperty
+    ├── 找不到 XML → mapper-locations 路径不对
+    └── 中文乱码 → 连接 URL 加字符集参数
+```
+
+
+
 案例
 
 ![image-20260829175153295](Java web.assets/image-20260829175153295.png)
@@ -549,3 +618,163 @@ JavaEE三层架构：
 ### Mapper代理开发
 
 Mapper代理开发是MyBatis提供的一种**接口式编程**方式。你**只需要编写一个Mapper接口**，MyBatis会自动为你生成这个接口的实现类（动态代理对象），你无需编写传统的`xxxMapper.xml`对应的`DaoImpl`实现类。
+
+# 使用Mybatis和纯JDBC区别
+
+#### 纯 JDBC 
+
+```java
+public List<User> findUsersByAge(int minAge, int maxAge) {
+    List<User> users = new ArrayList<>();
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet rs = null;
+    try {
+        // 1. 手动加载驱动、获取连接
+        Class.forName("com.mysql.cj.jdbc.Driver");
+        conn = DriverManager.getConnection(
+            "jdbc:mysql://localhost:3306/test", "root", "123456");
+
+        // 2. 拼接动态 SQL（注意：这里用占位符无法处理动态字段，只能用字符串拼接）
+        String sql = "SELECT id, name, age FROM user WHERE age >= ? AND age <= ?";
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, minAge);
+        pstmt.setInt(2, maxAge);
+        rs = pstmt.executeQuery();
+
+        // 3. 手动遍历 ResultSet，封装成对象
+        while (rs.next()) {
+            User user = new User();
+            user.setId(rs.getInt("id"));
+            user.setName(rs.getString("name"));
+            user.setAge(rs.getInt("age"));
+            users.add(user);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    } finally {
+        // 4. 手动关闭资源（必须按顺序）
+        try { if (rs != null) rs.close(); } catch (SQLException e) { e.printStackTrace(); }
+        try { if (pstmt != null) pstmt.close(); } catch (SQLException e) { e.printStackTrace(); }
+        try { if (conn != null) conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+    }
+    return users;
+}
+```
+
+#### 使用Mybatis
+
+**Mapper 接口（Java）：**
+
+```java
+    public interface UserMapper {
+        // 直接用 XML 或注解写动态 SQL
+        List<User> findUsersByAge(@Param("minAge") int minAge, 
+                                  @Param("maxAge") int maxAge);
+
+        @Options(useGeneratedKeys = true, keyProperty = "id")  // 一行注解搞定返回 ID
+        int insertUser(User user);
+    }
+```
+
+>  XML 是什么？
+>
+> **XML** 是一种**标记语言**（类似 HTML），在 MyBatis 里它专门用来**集中存放 SQL 语句**。也就是.xml文件
+>
+> ##### 注解是什么？
+>
+> **注解**就是**直接写在 Java 方法上的标签**，用 `@` 开头，把 SQL 和 Java 代码放在一起。
+
+
+
+**Mapper XML（动态 SQL）：**
+
+```java
+<select id="findUsersByAge" resultType="User">
+    SELECT id, name, age FROM user
+    <where>
+        <if test="minAge != null and minAge > 0">
+            AND age >= #{minAge}
+        </if>
+        <if test="maxAge != null and maxAge > 0">
+            AND age <= #{maxAge}
+        </if>
+    </where>
+</select>
+
+<insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO user(name, age) VALUES(#{name}, #{age})
+</insert>
+```
+
+**业务层调用：**
+
+```java
+@Autowired
+private UserMapper userMapper;
+
+public void demo() {
+    // 1. 查询 - 动态条件自动生成 SQL，无需手动拼接
+    List<User> users = userMapper.findUsersByAge(18, 30);
+    
+    // 2. 插入 - 执行后 user 对象自动获得自增 ID
+    User newUser = new User("张三", 25);
+    userMapper.insertUser(newUser);
+    System.out.println("新ID: " + newUser.getId());  // 直接获取
+}
+```
+
+![image-20260831175646082](Java web.assets/image-20260831175646082.png)
+
+#### 如果用Mybatis的话不一样的操作要写不同的接口吗，比如查询和添加?
+
+**一张表对应一个 Mapper 接口,对应一个.xml文件，各种操作都写成方法**
+
+### 动态SQL
+
+**动态SQL = 根据传入参数的不同，在运行时动态拼接出不同的SQL语句。**
+
+### 注解
+
+注解是写在接口代码里的，写注解就不用写配置文件了
+
+![image-20260831185658540](Java web.assets/image-20260831185658540.png)
+
+# HTML（超文本标记语言）
+
+**HTML是一种语言，和Java一样，所有的网页都是用HTML写出来的，**
+
+**超文本：超越了文本的限制，比普通文本更强大，除了文字信息，还可以定义图片，音频，视频等内容**
+
+**标记语言：由标签构成的语言**
+
+**HTML运行在浏览器上，，HTML标签由浏览器进行解析**
+
+**HTML标签都是预定义好的**
+
+**W3C标准：网页主要由三部分组成**
+
+**结构：HTML**
+
+**表现：CSS**（层叠样式表）
+
+CSS也是一门语言
+
+**行为：JavaScript**
+
+# Web核心
+
+## B/S架构
+
+![image-20260831191604409](Java web.assets/image-20260831191604409.png)
+
+- **B/S 架构**：Browser/Server，浏览器/服务器 架构模式，它的特点是，客户端只需要浏览器，应用程序的逻辑和数据都存储在服务器端。浏览器只需要请求服务器，获取Web资源，服务器把Web资源发送给浏览器即可
+  - 好处：易于维护升级：服务器端升级后，客户端无需任何部署就可以使用到新的版本
+
+* **静态资源**：HTML、CSS、JavaScript、图片等。负责页面展现
+
+- **动态资源**：Servlet、JSP等。负责逻辑处理
+- **数据库**：负责存储数据
+
+- **HTTP协议**：定义通信规则
+- **Web服务器**：负责解析HTTP协议，解析请求数据，并发送响应数据
