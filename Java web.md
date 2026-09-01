@@ -778,3 +778,578 @@ CSS也是一门语言
 
 - **HTTP协议**：定义通信规则
 - **Web服务器**：负责解析HTTP协议，解析请求数据，并发送响应数据
+
+# HTTP
+
+超文本传输协议
+
+浏览器和服务器之间传输数据的规则
+
+- HTTP 协议特点：
+
+  1. 基于TCP协议：面向连接，安全
+  2. 基于请求-响应模型的：一次请求对应一次响应
+  3. HTTP协议是无状态的协议：对于事务处理没有记忆能力。每次请求-响应都是独立的。
+
+  - 缺点：多次请求间不能共享数据。
+  - 优点：速度快
+
+## HTTP-请求数据格式
+
+- 请求数据分为3部分：
+  1. 请求行：请求数据的第一行。其中GET表示请求方式，/表示请求资源路径，HTTP/1.1表示协议版本
+  2. 请求头：第二行开始，格式为key: value形式。
+  3. 请求体：POST请求的最后一部分，存放请求参数
+
+```
+GET / HTTP/1.1
+Host: www.itcast.cn
+Connection: keep-alive
+Cache-Control: max-age=0 Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 Chrome/91.0.4472.106
+```
+
+- **GET请求和 POST请求区别：**
+
+1. GET请求请求参数在请求行中，没有请求体。
+   POST请求请求参数在请求体中
+2. GET请求请求参数大小有限制，POST没有
+
+## HTTP-响应数据格式
+
+- **响应数据分为3部分**：
+  1. **响应行**：响应数据的第一行。其中HTTP/1.1表示协议版本，200表示响应状态码，OK表示状态码描述
+  2. **响应头**：第二行开始，格式为key: value形式
+  3. **响应体**：最后一部分。存放响应数据
+
+### HTTP/1.1 200 OK
+
+Server: Tengine
+Content-Type: text/html
+Transfer-Encoding: chunked...
+
+ <html> <head> <title></title> </head> <body></body> </html>
+
+| 状态码分类 | 说明                                                         |
+| :--------- | :----------------------------------------------------------- |
+| 1XX        | 响应中——临时状态码，表示请求已经接受，告诉客户端应该继续请求或者如果它已经完成则忽略它 |
+| 2XX        | 成功——表示请求已经被成功接收，处理已完成                     |
+| 3XX        | 重定向——重定向到其他地方：它让客户端再发起一个请求以完成整个处理。 |
+| 4XX        | 客户端错误——处理发生错误，责任在客户端，如：客户端请求一个不存在的资源，客户端未被授权，禁止访问等 |
+| 5XX        | 服务器端错误——处理发生错误，责任在服务器端，如：服务器端出错，HTTP版本不支持等 |
+
+------
+
+# web服务器
+
+web服务器是一个应用程序，对HTTP协议的操作进行封装，使得程序员不用直接对协议进行操作，让web开发更加便捷，主要功能是提供网上信息浏览服务
+
+**Web服务器通过TCP/IP网络，接收HTTP请求，解析协议内容，处理资源映射，并返回HTTP响应。**
+
+![image-20260901090343311](Java web.assets/image-20260901090343311.png)
+
+# Servlet
+
+Java提供的一门动态web资源开发技术
+
+**Servlet本质就是一个运行在服务端的Java对象**，它遵循Servlet规范，能够被容器识别和调用，用来接收HTTP请求并生成动态响应。
+
+如果要再深入一点，从三个维度理解：
+
+| 维度         | 一句话总结                                                   |
+| :----------- | :----------------------------------------------------------- |
+| **从代码看** | 就是一个继承了`HttpServlet`的Java类，重写了`doGet()`/`doPost()`方法 |
+| **从运行看** | 是一个由容器（如Tomcat）创建、管理、销毁的**单例对象**，每个请求在独立线程中调用它 |
+| **从架构看** | 是Java Web开发中**请求处理的入口点**，把HTTP协议转换成Java方法调用，再把Java对象转换成HTTP响应 |
+
+# 请求和响应的流程
+
+```java
+浏览器（客户端）
+    ↓ ① 发送HTTP请求
+┌─────────────────────────────────────────────────────────┐
+│                    Web服务器                            │  ← 第1层：网络入口
+│   （例如：Nginx、Apache HTTP Server、IIS）              │
+│                                                        │
+│   ② 接收TCP连接，解析HTTP请求报文                       │
+│   ③ 判断请求类型：                                      │
+│       - 静态资源（/static/*, /*.html）                  │
+│         → 直接读取静态文件，返回响应                    │
+│       - 动态请求（/api/*, /*.jsp, /*.do）              │
+│         → 转发给后端Servlet容器                        │
+└─────────────────────────────────────────────────────────┘
+    ↓ ④ 转发动态请求（通过HTTP/AJP协议）
+┌─────────────────────────────────────────────────────────┐
+│                Servlet容器 / Web容器                    │  ← 第2层：Java运行时
+│   （例如：Tomcat、Jetty、JBoss、WebLogic）              │
+│                                                        │
+│   ⑤ 连接器（Connector）接收请求                         │
+│   ⑥ 将HTTP请求解析并封装为 HttpServletRequest 对象      │
+│   ⑦ 根据URL路径映射查找对应的 Servlet 实现类            │
+│   ⑧ 从线程池中分配一个线程，调用 Servlet 的 service()   │
+│   ⑨ 将 Request 和 Response 对象传入 Servlet             │
+└─────────────────────────────────────────────────────────┘
+    ↓ ⑩ 调用
+┌─────────────────────────────────────────────────────────┐
+│              Servlet（Java业务逻辑层）                  │  ← 第3层：业务逻辑
+│   ⑪ 由开发人员实现 HttpServlet 子类                     │
+│   ⑫ doGet() / doPost() / service() 执行业务逻辑        │
+│       - 从 HttpServletRequest 中读取请求参数            │
+│       - 调用 Service 层 / DAO 层访问数据库              │
+│       - 执行业务计算 / 数据加工                         │
+│   ⑬ 将处理结果写入 HttpServletResponse 对象            │
+│       - 设置响应头（Content-Type、状态码等）            │
+│       - 写入响应体（HTML、JSON、XML等）                │
+└─────────────────────────────────────────────────────────┘
+    ↓ ⑭ 返回（逆向传递）
+Servlet容器将 Response 对象序列化为标准 HTTP 响应报文
+    ↓
+Web服务器将响应报文发回给客户端
+    ↓
+浏览器（客户端）  ⑮ 解析并渲染响应内容
+```
+
+### Tomcat
+
+### Tomcat是**Servlet容器的一个具体实现**，同时也是一个**轻量级Web服务器**。它实现了Java Servlet、JSP、WebSocket等Java EE规范，为Servlet的运行提供运行时环境。
+
+![image-20260901110213198](Java web.assets/image-20260901110213198.png)
+
+##### HttpServlet使用步骤
+
+**①继承HttpServlet**
+
+**②重写doGet和doPost方法**
+
+![image-20260901111146693](Java web.assets/image-20260901111146693.png)
+
+![image-20260901111638830](Java web.assets/image-20260901111638830.png)
+
+## SessionFactory 
+
+> **SessionFactory 是 Hibernate 的核心接口；MyBatis 是另一个独立的持久层框架，它没有 SessionFactory 这个概念，它的核心接口是 `SqlSessionFactory`。**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Hibernate 体系                          │
+│                                                          │
+│  SessionFactory（重量级，全局单例）                       │
+│       ↓ 创建                                             │
+│  Session（轻量级，一次请求一个）                          │
+│       ↓ 执行                                             │
+│  CRUD 操作（自动生成 SQL）                                │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    MyBatis 体系                            │
+│                                                          │
+│  SqlSessionFactory（重量级，全局单例）                    │
+│       ↓ 创建                                             │
+│  SqlSession（轻量级，一次请求一个）                       │
+│       ↓ 执行                                             │
+│  通过 XML/注解中定义的 SQL 执行数据库操作                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+# 三层架构
+
+这是软件工程最经典的物理分层，目的是**“高内聚、低耦合”**。通常分为：
+
+- **表示层（Web/View层）**：负责与用户交互，展示界面，接收用户请求。
+- **业务逻辑层（Service/BLL层）**：负责处理核心业务规则（如计算价格、校验权限、流转状态）。
+- **数据访问层（DAO/DAL层）**：负责与数据库打交道（增删改查）
+
+# 会话跟踪技术
+
+# JWT
+
+**什么是JWT？**
+
+JSON Web Token，通过数字签名的方式，以JSON对象为载体，在不同的服务终端之间安全的传输信息。
+
+**JWT有什么用？**
+
+JWT最常见的场景就是授权认证，一旦用户登录，后续每个请求都将包含JWT，系统在每次处理用户请求的之前，都要先进行JWT安全校验，通过之后再进行处理。
+
+### **JWT的组成**
+
+JWT由3部分组成，用.拼接
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlRvbSIsInJvbGUiOiJhZG1pbiIsInN1YiI6ImFkbWluLxRlc3QiLcJ1eHAiOjE2MjMyMjM2NzUsImp0aS16ImQ2MTJjZjcxLWI5ZmUtNGMwNy04MzQwLTVi0wViZmMyNjExNyJ9.F0s9Y7rYNDc2A0idnSPrgg2XTYePU0yGZ598h2gtabE
+```
+
+#### 第一段：Header（头部，明文）
+
+```
+{ "alg": "HS256", "typ": "JWT" }
+```
+
+- 告诉服务器：我是用 `HS256` 算法签名的。
+
+#### 第二段：Payload（载荷，明文）
+
+```
+{ 
+  "sub": "1001",      // 用户ID
+  "name": "张三",
+  "iat": 1690000000,  // 签发时间
+  "exp": 1690003600   // 过期时间
+}
+```
+
+- **注意**：这里**绝对不能**放密码、手机号、身份证号等敏感信息！因为它只是**Base64Url编码**，不是加密，用浏览器F12或者在线工具直接就能解码出来，**全网可见**。
+
+#### 第三段：Signature（签名，防伪标识）
+
+这是JWT的灵魂。它是把前两段（Header + Payload）加上一个**只有服务器知道的秘钥（Secret）**，通过加密算法算出来的一串哈希值。
+
+> **公式**：`signature = hash( base64(Header) + "." + base64(Payload) + Secret )`
+
+**服务器验证时**：拿到Token -> 拆出前两段 -> 用自己本地的Secret重新算一遍哈希 -> 对比和第三段是否一致。一致，说明票没被篡改；不一致，直接拒绝。
+
+| 优点（面试常答）                                            | 对应的致命缺陷（面试高分点）                                 |
+| :---------------------------------------------------------- | :----------------------------------------------------------- |
+| **水平扩展极佳**：随便哪台服务器都能验证，不用共享Session。 | **无法主动失效**：签发后，在有效期内（比如1小时），即使改了密码、被黑客盗用，**服务器也无法主动把它作废**，只能眼睁睁等到过期。 |
+| **性能高**：验证时不需要查Redis/DB，纯CPU计算，速度极快。   | **Payload 膨大**：如果把用户菜单、权限列表都塞进JWT，每次请求Header携带几KB数据，在高并发下会**浪费大量带宽**。 |
+| **跨语言通用**：任何语言都能解析。                          | **登出困难**：前端删掉Token，但后端依然认为该Token有效。     |
+
+### 致命漏洞：算法混淆攻击（None算法攻击）
+
+这是JWT官方曾经犯过的低级错误，但现在面试官非常爱问。
+
+- **漏洞原理**：Header中`alg`字段是客户端传过来的。如果黑客把 `alg` 改成 `"none"`，并删掉签名部分，服务端某些老旧依赖库会认为“无需签名验证”，直接信任伪造的Payload，从而越权登录。
+- **2026年解决方案**：**必须在服务端强制指定签名算法（如只接受HS256或RS256），绝对不要信任客户端的Header声明。**
+
+# 写JWT代码
+
+**整体结构**
+
+```
+src/main/java/com/example/demo/
+│
+├── utils/                           【包名】：工具类
+│   └── JwtUtil.java                 【文件1】：放 定义（生成） 和 解析 的底层代码
+│
+├── filter/                          【包名】：过滤器
+│   └── JwtAuthenticationFilter.java 【文件2】：放 每次请求拦截解析 的代码
+│
+├── controller/                      【包名】：控制器
+│   └── UserController.java          【文件3】：放 登录时生成Token 的代码
+│
+└── resources/                       【资源文件夹】
+    └── application.yml              【文件4】：放 秘钥和过期时间 的配置文件
+```
+
+### 📄 文件1：`JwtUtil.java`（放底层算法）
+
+**位置**：`src/main/java/com/example/demo/utils/JwtUtil.java`
+**职责**：这里是 JWT 的**发动机**，定义生成和解析的具体算法
+
+```
+package com.example.demo.utils; // 注意包名
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@Component // 告诉Spring，这个类要创建对象交给Spring管理
+public class JwtUtil {
+
+    // @Value 是从配置文件 application.yml 里读取秘钥
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Value("${jwt.expire}")
+    private Long expire;
+
+    // -------- 1. 生成 Token（定义代码写在这里） --------
+    public String generateToken(String username) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", username);
+        
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(username)
+                .setId(UUID.randomUUID().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expire))
+                .signWith(SignatureAlgorithm.HS256, secret)
+                .compact();
+    }
+
+    // -------- 2. 解析 Token（解析代码写在这里） --------
+    public Claims parseToken(String token) {
+        return Jwts.parser()
+                .setSigningKey(secret)
+                .parseClaimsJws(token)
+                .getBody();
+    }
+    
+    // 还可以写 是否过期、获取用户名 等方法...
+}
+```
+
+------
+
+### 📄 文件2：`JwtAuthenticationFilter.java`（调用解析）
+
+**位置**：`src/main/java/com/example/demo/filter/JwtAuthenticationFilter.java`
+**职责**：拦截所有请求，**调用** `JwtUtil` 里的解析方法。
+
+```
+package com.example.demo.filter;
+
+import com.example.demo.utils.JwtUtil; // 引入工具类
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.filter.OncePerRequestFilter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    @Autowired
+    private JwtUtil jwtUtil; // 把工具类对象注入进来
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, 
+                                    HttpServletResponse response, 
+                                    FilterChain chain) {
+        // 拿到前端传过来的 Token
+        String token = request.getHeader("Authorization");
+        
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+            
+            // 【调用解析】这里就是解析代码运行的地方！
+            // 如果解析失败（过期/篡改），会直接抛异常
+            jwtUtil.parseToken(token); 
+            
+            // 解析通过，放行请求...
+        }
+        chain.doFilter(request, response);
+    }
+}
+```
+
+
+
+------
+
+### 📄 文件3：`UserController.java`（调用生成）
+
+**位置**：`src/main/java/com/example/demo/controller/UserController.java`
+**职责**：登录成功后，**调用** `JwtUtil` 里的生成方法。
+
+```
+package com.example.demo.controller;
+
+import com.example.demo.utils.JwtUtil; // 引入工具类
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+
+    @Autowired
+    private JwtUtil jwtUtil; // 把工具类对象注入进来
+
+    @PostMapping("/login")
+    public String login(String username, String password) {
+        // 假设校验密码通过...
+        
+        // 【调用生成】生成 Token 并返回给前端
+        String token = jwtUtil.generateToken(username);
+        return token;
+    }
+}
+```
+
+
+
+------
+
+### 📄 文件4：`application.yml`（配置文件）
+
+**位置**：`src/main/resources/application.yml`
+**职责**：把写死在代码里的秘钥提取出来，方便修改。
+
+```
+jwt:
+  secret: abcdefg123456  # 秘钥（生产环境要用复杂的，且不要提交到Git）
+  expire: 3600000        # 过期时间（毫秒），这里设了1小时
+```
+
+==相应的框架==
+
+# 包，接口，对象，方法，类
+
+包就像是文件夹
+
+## JWT 项目中的完整关系链（闭环）
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  包：com.demo.utils                                             │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  接口：无（工具类通常不需要接口）                           │ │
+│  │  类：JwtUtil                                              │ │
+│  │  ├── 属性：secret, expire                                 │ │
+│  │  ├── 方法1：generateToken()  ← 定义生成逻辑               │ │
+│  │  ├── 方法2：parseToken()     ← 定义解析逻辑               │ │
+│  │  └── 方法3：isExpired()                                  │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                           ↓ 实例化                              │
+│  对象：jwtUtil（Spring 用 @Autowired 注入）                    │
+│  ├── 持有具体数据：secret="abc123"                            │
+│  └── 可以调用：jwtUtil.generateToken("tom")                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+# **Filter**
+
+- 概念：Filter 表示过滤器，是 JavaWeb 三大组件(Servlet、Filter、Listener)之一。
+- 过滤器可以把对资源的请求拦截下来，从而实现一些特殊的功能。
+- 过滤器一般完成一些通用的操作，比如：权限控制、统一编码处理、敏感字符处理等...
+
+```java
+@WebFilter(urlPatterns = "/**")
+
+public class MyFilter implements Filter {
+    //定义一个类并实现接口
+    public void init(FilterConfig filterConfig) throws ServletException {
+    ...
+    }
+
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+    ...
+    }
+
+    public void destroy() {
+    ...
+    }
+}
+```
+
+过滤器放行之后请求资源，请求资源结束后会再次回到过滤器
+
+**整体的流程：**
+
+1 执行放行前逻辑
+2 放行
+3 访问资源
+4 执行放行后逻辑
+
+# !![image-20260901144548581](Java web.assets/image-20260901144548581.png)拦截路径的四种配置方式
+
+| 配置方式     | 写法          | 含义                        | 示例                                           |
+| :----------- | :------------ | :-------------------------- | :--------------------------------------------- |
+| **精确匹配** | `/user/info`  | 只拦截这一个具体路径        | `/user/info` 会被拦，`/user/list` 不拦         |
+| **目录匹配** | `/user/*`     | 拦截该目录下的所有资源      | `/user/info`、`/user/list` 都拦，`/admin` 不拦 |
+| **后缀匹配** | `*.do`        | 拦截所有以 `.do` 结尾的请求 | `/user.do`、`/login.do` 都拦                   |
+| **全匹配**   | `/*` 或 `/**` | 拦截所有请求（最常用）      | 所有请求都经过 Filter                          |
+
+> **注意**：`/*` 和 `/**` 在 Filter 中**没有区别**，都是拦截所有请求。但在 Spring MVC 的 Interceptor 中，`/**` 才表示多级目录。
+
+# AJAX
+
+AJAX（Asynchronous JavaScript and XML）是一种在不刷新整个页面的情况下，从服务器获取数据并更新网页部分内容的技术。
+
+### 为什么要用 AJAX？
+
+传统网页：点击按钮 → 整个页面重新加载 → 用户体验差。
+ AJAX：点击按钮 → 只请求需要的数据 → 用 JavaScript 更新页面局部 → 流畅。
+
+### AJAX 在代码上的本质是什么？
+
+**用 JavaScript 主动向服务器发出一个请求，拿到数据后自己处理，而不是让浏览器刷新整个页面。**
+
+### 最简代码（带解释）
+
+JavaScript
+
+```javascript
+fetch('https://jsonplaceholder.typicode.com/todos/1')
+  .then(response => response.json())
+  .then(data => {
+    console.log(data);  // 这里拿到数据了
+  });
+```
+
+我们一行一行翻译成人话：
+
+1. **fetch('网址')**
+   → 去服务器请求数据（这是 AJAX 的核心动作）
+2. **.then(response => response.json())**
+   → 服务器返回的原始数据，我们把它转成容易用的格式
+3. **.then(data => { ... })**
+   → 数据准备好了，现在可以随便用了（比如打印出来，或者显示在页面上）
+
+## 用AJAX和不用AJAX
+
+* ### 非 AJAX（会刷新整个页面）
+
+HTML
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>非AJAX示例</title>
+</head>
+<body>
+
+  <h2>非 AJAX 方式</h2>
+  <p>点击下面的链接，整个页面会刷新/跳转：</p>
+
+  <a href="https://jsonplaceholder.typicode.com/todos/1">
+    点我获取数据（会刷新页面）
+  </a>
+
+</body>
+</html>
+```
+
+* ### AJAX（不刷新页面）
+
+HTML
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AJAX示例</title>
+</head>
+<body>
+
+  <h2>AJAX 方式</h2>
+  <p>点击按钮，页面不会刷新，只更新下面的内容：</p>
+
+  <button onclick="getData()">点我获取数据（不刷新页面）</button>
+
+  <div id="result" style="margin-top: 20px; color: blue;">
+    这里会显示结果
+  </div>
+
+  <script>
+    function getData() {
+      fetch('https://jsonplaceholder.typicode.com/todos/1')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('result').innerText = data.title;
+        });//这部分就是对页面的更新处理，把data.titlefu'zhi'd
+    }
+  </script>
+
+</body>
+</html>
+```
