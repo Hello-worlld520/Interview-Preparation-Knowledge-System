@@ -1346,10 +1346,47 @@ HTML
         .then(response => response.json())
         .then(data => {
           document.getElementById('result').innerText = data.title;
-        });//这部分就是对页面的更新处理，把data.titlefu'zhi'd
+        });//这部分就是对页面的更新处理，把data.title赋值到原来的位置
     }
   </script>
 
 </body>
 </html>
 ```
+
+
+
+# Axios 快速入门  （AJAX的一个框架）
+
+1. **引入 axios 的 js 文件**  
+
+<script src="js/axios-0.18.0.js"></script>
+
+2. **使用 axios 发送请求，并获取响应结果**  
+
+```java
+axios({
+  method: "get",
+  url: "http://localhost:8080/ajax-demo1/aJAXDemo1?username=zhangsan"
+}).then(function (resp) {
+  alert(resp.data);
+});
+
+axios({
+  method: "post",
+  url: "http://localhost:8080/ajax-demo1/aJAXDemo1",
+  data: "username=zhangsan"
+}).then(function (resp) {
+  alert(resp.data);
+});
+```
+
+##### get 和 post区别？
+
+**GET 是查询，POST 是提交**
+
+# spring boot
+
+springboot是基于spring的一款框架，二者都是框架，但是spring配置起来非常之麻烦
+
+spring：**Spring（框架） → 核心思想是 IOC（控制反转） → 通过容器（Container）这个工具来实现。**
