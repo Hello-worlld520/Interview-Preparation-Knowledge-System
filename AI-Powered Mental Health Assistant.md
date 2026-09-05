@@ -44,6 +44,14 @@
   - Spring 家族中基于 JDBC 的轻量级数据访问框架，属于 Spring Data 项目的一部分。
   - **解决什么问题**：让你通过注解（如 `@Table`、`@Id`、`@Column`）将 Java 实体类直接映射到数据库表，省去手写大量 JDBC 模板代码（如 `PreparedStatement`、`ResultSet` 解析）。
 
+# 一 第一个网络接口和基础配置
+
+## 后端项目的三层
+
+- **Controller** —— **控制层**，负责接收请求和返回响应，写一些接口
+- **Service** —— **业务逻辑层**，负责处理核心业务。
+- **Mapper / DAO** —— **数据访问层**，负责操作数据库。
+
 ### Spring Boot 配置文件格式
 
 Spring Boot 支持两种配置文件格式：
@@ -79,13 +87,17 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 ```
 
-# 定义一个接口
+# 定义一个网络接口
 
 下面三个都是通过注解来完成的
 
 * 定义请求路径
 * 定义请求类型
 * 定义返回格式
+
+其实是一个控制类，控制类是API接口（网络层面的接口不是Java语法的接口)
+
+控制类是网络访问的接口
 
 ````java
 import org.springframework.web.bind.annotation.GetMapping;
@@ -102,5 +114,206 @@ public class Test {
 }
 ````
 
+### 关于这三个注解
 
+这三个注解是 Spring Boot 开发中最基础的三个注解，它们共同把一个普通的 Java 类变成了一个能接收 HTTP 请求的控制器
+
+## 1. `@RestController` —— 标记这个类是“控制器”，且返回数据而不是页面
+
+```
+@RestController  // ← 这是类级别的注解
+public class Test {
+    // ...
+}
+```
+
+**含义：** 告诉 Spring：“这个类是一个 **Web 控制器**，里面所有方法的返回值都要**直接写进 HTTP 响应体（Response Body）**，而不是跳转到一个页面。”
+
+------
+
+## 2. `@RequestMapping("/api")` —— 给这个类里的所有接口加一个“共同前缀”
+
+```
+@RequestMapping("/api")  // ← 类级别的路径
+public class Test {
+    // ...
+}
+```
+
+**含义：** 告诉 Spring：“这个控制器里所有接口的 URL 前面，都要加上 `/api`。”
+
+**好处：** 方便统一管理接口路径。比如以后想把所有接口从 `/api` 改成 `/v2/api`，只需要改这一行就行。
+
+------
+
+## 3. `@GetMapping("/test")` —— 标记这个方法处理 GET 请求，路径是 `/test`
+
+```
+@GetMapping("/test")  // ← 方法级别的注解
+public String test() {
+    return "hello";
+}
+```
+
+**含义：** 告诉 Spring：“当客户端发送一个 **GET 请求**，访问路径为 **`/test`** 时，由这个方法处理。”
+
+### 五种最常见的请求类型
+
+我们可以用一个 **“图书馆管理系统”** 的例子来理解，假设我们要管理书籍（Book）数据：
+
+| 请求类型   | 作用（你要干嘛）         | 比喻（图书馆）                               | 代码中的注解     |
+| :--------- | :----------------------- | :------------------------------------------- | :--------------- |
+| **GET**    | **查**询数据（只看不摸） | 查询书架上有哪些书，或查询某本书的详细信息。 | `@GetMapping`    |
+| **POST**   | **新**增数据（创建）     | 购入一本新书，需要在系统里**新增**一条记录。 | `@PostMapping`   |
+| **PUT**    | **修**改数据（全量覆盖） | 把一本旧书的信息**完全替换**成新的信息。     | `@PutMapping`    |
+| **PATCH**  | **修**改数据（局部更新） | 只修改某本书的价格或位置，其他信息不动。     | `@PatchMapping`  |
+| **DELETE** | **删**除数据             | 把一本破损的书从系统中**移除**。             | `@DeleteMapping` |
+
+## reesult类
+
+**用于统一返回值类型的类**
+
+```java
+package org.example.ai.spingboot.common;
+
+import lombok.Data;
+
+@Data
+public class Result<T> {
+    private String code;
+    private String msg;
+    private T data;
+}
+public static <T> Result<T> success() {
+    Result<T> result = new Result<>();
+    result.setCode("200");
+    result.setMsg("success");
+    return result;
+}
+```
+
+- [x] ##### 成功写出一个接口并访问
+
+## 访问地址的格式
+
+```
+http://       localhost       :8080         /api/test
+  ① 协议       ② 服务器地址    ③ 端口       ④ 路径
+```
+
+### 路径：`/api/test`
+
+- 这是你**在代码里写的路径**，由两部分拼成：
+
+| 写在哪儿   | 代码                      | 路径            |
+| :--------- | :------------------------ | :-------------- |
+| 类上       | `@RequestMapping("/api")` | `/api`          |
+| 方法上     | `@GetMapping("/test")`    | `/test`         |
+| **拼起来** |                           | **`/api/test`** |
+
+# Lombok
+
+**Lombok 就是自动生成 getter/setter 等样板代码的工具，用一个注解代替一堆重复代码，让 Java 类更简洁**
+
+## 在 Result 类中
+
+```java
+import lombok.Data;
+
+@Data
+public class Result<T> {
+    private String code;
+    private String msg;
+    private T data;
+}
+```
+
+这等价于你手动写了：
+
+```java
+public class Result<T> {
+    private String code;
+    private String msg;
+    private T data;
+
+    // 无参构造
+    public Result() {}
+
+    // getter
+    public String getCode() { return code; }
+    public String getMsg() { return msg; }
+    public T getData() { return data; }
+
+    // setter
+    public void setCode(String code) { this.code = code; }
+    public void setMsg(String msg) { this.msg = msg; }
+    public void setData(T data) { this.data = data; }
+
+    // toString
+    @Override
+    public String toString() {
+        return "Result{code=" + code + ", msg=" + msg + ", data=" + data + "}";
+    }
+
+    // equals 和 hashCode（省略具体代码）
+}
+```
+
+### Spring Boot 只会扫描**启动类所在的包及其子包**。
+
+所以common和controller包都得在启动类下，不然扫描不到
+
+# 二 登录接口
+
+#### DTO数据传输对象
+
+它的核心目的是在系统各层（如 Controller、Service、数据库）之间传递数据，通常是一个简单的 Java 对象，只包含属性及其对应的 getter/setter 方法，不包含任何业务逻辑。
+
+## Spring validation
+
+一套通过**注解**来优雅、高效地完成数据校验的规范及实现
+
+@NotBlank
+
+这个字段必须有实际内容，不能是空的，也不能是空格
+
+### 登录接口
+
+```java
+@RestController
+@RequestMapping("/api/user")
+public class User {
+    @PostMapping("/login")
+    public Result<String> login(@Valid @RequestBody UserLoginCommandDTO commandDTO) {
+        //校验+从请求体拿数据+存到UserLoginCommandDTO类型名字是commandDTO的变量中
+        System.out.println(commandDTO.getUsername());
+        System.out.println(commandDTO.getPassword());
+        return null;
+    }
+}
+```
+
+# 三 校验异常处理
+
+##### 参数校验异常处理代码
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    // 处理参数校验异常
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public Result<String> handlerException(MethodArgumentNotValidException e) {
+        // 处理异常数据的处理：获取所有校验失败的信息，用逗号拼接成字符串
+        String message = e.getBindingResult()          // 获取校验结果对象
+                          .getFieldErrors()            // 获取所有字段错误列表（List<FieldError>）
+                          .stream()                    // 转换成流
+                          .map(FieldError::getDefaultMessage) // 提取每条错误的 message
+                          .collect(Collectors.joining(",")); // 用逗号拼接成字符串
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
+    }
+}
+```
+
+##### e是 Spring 自动传入的异常对象
 
