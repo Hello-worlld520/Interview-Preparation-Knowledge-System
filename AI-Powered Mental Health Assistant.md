@@ -317,3 +317,101 @@ public class GlobalExceptionHandler {
 
 ##### e是 Spring 自动传入的异常对象
 
+# 四 用户实体类
+
+**数据库里的"用户表"映射成代码里的"用户对象"**。
+
+## MyBatis-Plus 注解
+
+```java
+@Data
+@TableName("user")
+public class User {
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
+
+    private String username;
+    private String password;
+    private String email;
+    private String nickname;
+    private String avatar;
+    private String phone;
+    private Integer gender;
+    private LocalDate birthday;
+
+    @TableField("user_type")
+    private Integer userType;
+
+    private Integer status;
+
+    @TableField("created_at")
+    private LocalDateTime createdAt;
+
+    @TableField("updated_at")
+    private LocalDateTime updatedAt;
+}
+```
+
+## 类级别注解
+
+### `@Data`
+
+- **来源**：Lombok 库
+- **作用**：自动生成 getter、setter、toString、equals、hashCode 等方法
+- **效果**：你不用手动写 `getId()`、`setUsername()` 这些重复代码，Lombok 会在编译时帮你补全
+
+------
+
+### `@TableName("user")`
+
+- **来源**：MyBatis-Plus
+- **作用**：告诉 MyBatis-Plus，这个实体类对应数据库里的 **`user`** 表
+- **为什么需要**：如果类名是 `User`，默认会去找 `user` 表，大小写不敏感时可以不写；但如果表名不同（比如 `t_user`），就必须用这个注解指定
+
+------
+
+## 字段级别注解
+
+### `@TableId(value = "id", type = IdType.AUTO)`
+
+- **来源**：MyBatis-Plus
+- **作用**：标记这个字段是数据库表的**主键**
+- **参数解释**：
+  - `value = "id"`：对应数据库表里的 `id` 字段
+  - `type = IdType.AUTO`：主键生成策略是**自增**（数据库自动生成，插入时不用手动赋值）
+- **其他可选类型**：
+  - `IdType.INPUT`：手动输入
+  - `IdType.UUID`：自动生成 UUID
+  - `IdType.ASSIGN_ID`：雪花算法生成（MyBatis-Plus 默认）
+
+------
+
+### `@TableField("user_type")`
+
+- **来源**：MyBatis-Plus
+- **作用**：标记字段映射到数据库的哪一列
+- **为什么这里需要**：因为 Java 字段名是 `userType`（驼峰命名），但数据库列名是 `user_type`（下划线命名），所以需要用这个注解指定映射关系
+- **如果不写会怎样**：MyBatis-Plus 默认开启驼峰转下划线，所以其实 `userType` → `user_type` 能自动转换，这里写出来是为了明确指定
+
+------
+
+### `@TableField("created_at")` 和 `@TableField("updated_at")`
+
+- 同理，映射数据库的 `created_at` 和 `updated_at` 列
+- 这两个字段通常配合数据库的 `CURRENT_TIMESTAMP` 和 `ON UPDATE CURRENT_TIMESTAMP` 使用，或者由代码自动填充
+
+------
+
+## 其他没有注解的字段
+
+像 `username`、`password`、`email` 这些字段**没有注解**，但 MyBatis-Plus 会通过**驼峰转下划线**自动映射：
+
+- `username` → `username`（一样）
+- `nickname` → `nickname`（一样）
+- `createdAt` 如果没写 `@TableField`，也会自动转成 `created_at`
+
+所以这些没注解的字段也能正常工作。
+
+## `@Pattern` 注解
+
+`@Pattern` 是 **Java Bean Validation（JSR-303/JSR-380）** 规范中的一个注解，用于**验证字符串字段是否符合指定的正则表达式规则**。
