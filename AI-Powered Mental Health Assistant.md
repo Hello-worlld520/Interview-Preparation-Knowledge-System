@@ -44,6 +44,16 @@
   - Spring 家族中基于 JDBC 的轻量级数据访问框架，属于 Spring Data 项目的一部分。
   - **解决什么问题**：让你通过注解（如 `@Table`、`@Id`、`@Column`）将 Java 实体类直接映射到数据库表，省去手写大量 JDBC 模板代码（如 `PreparedStatement`、`ResultSet` 解析）。
 
+# 最最笼统的后端书写任务
+
+* 基础的配置和连接
+* 定义测试接口并访问
+* 登录接口
+* 加JWT
+* 加JWT过滤器
+
+
+
 # 一 第一个网络接口和基础配置
 
 ## 后端项目的三层
@@ -417,6 +427,29 @@ public class User {
 `@Pattern` 是 **Java Bean Validation（JSR-303/JSR-380）** 规范中的一个注解，用于**验证字符串字段是否符合指定的正则表达式规则**。
 
 ## ==依赖注入==
+
+```
+@Resource
+    private JwtUtil jwtUtil;
+```
+
+`@Resource` 是 **JSR-250 规范**中定义的注解，用于**声明一个依赖项**，告诉 Spring 容器：**“这个字段需要一个 Bean，请在容器中帮我找到并赋值”**。
+
+`JwtUtil` 是一个 **Token 生成与解析工具类**。
+
+| 组成部分    | 技术含义                                                     |
+| :---------- | :----------------------------------------------------------- |
+| `@Resource` | 这是一个**注入点标记**。Spring 在启动时扫描到这个注解，就会执行依赖查找和注入逻辑。 |
+| `private`   | 访问修饰符。虽然字段是私有的，但 Spring 通过**反射（Reflection）** 机制绕过访问限制，强行赋值。 |
+| `JwtUtil`   | **依赖类型**。声明这个字段需要的是一个类型为 `JwtUtil` 的 Bean。 |
+| `jwtUtil`   | **变量名**。在 `@Resource` 的默认匹配策略中，这个名称会被用作 **Bean 的名称** 进行查找。 |
+
+### ⚙️ 执行流程（Spring 启动时）
+
+1. **扫描**：Spring 在启动时扫描所有 Bean，发现 `AuthController` 类中有一个标记了 `@Resource` 的字段。
+2. **查找**：Spring 根据 `@Resource` 的匹配规则，在容器中查找符合条件的 Bean。
+3. **赋值**：找到目标 Bean 后，通过反射将该 Bean 的引用赋值给 `jwtUtil` 字段。
+4. **注入完成**：`AuthController` 对象内部的 `jwtUtil` 字段现在持有了一个有效的 `JwtUtil` 实例，可以在业务方法中调用。
 
 # 自定义业务异常处理
 
