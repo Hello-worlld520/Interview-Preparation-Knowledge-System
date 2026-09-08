@@ -468,3 +468,26 @@ xxxxx.yyyyy.zzzzz
 | JWT 配置               | `application.yml`                     |
 
 **注意：** 如果 `UserMapper` 里还没有 `findByUsername` 方法，记得在 `UserMapper.java` 里加上
+
+- [ ] 先在xml文件里写好JWT需要约定的数据
+
+- [ ] 再在config写好配置类
+
+- [ ] 创建utill获取bean，写token生成工具
+
+- [ ] 构建响应DTO，用UserConvert 
+
+- [ ] 在service写调用逻辑
+
+  UserConvert是一个转换器，将数据库里的数据转换成返回给前端的人能看懂的信息
+
+  为什么之前login DTO不用转换器？
+
+  **只有"需要从 Entity 转换"的 DTO 才需要转换器。**
+  **如果 DTO 只是"接收前端数据"或"纯 Token 响应"，就不需要。**
+
+  login DTO它只是"接收容器"，前端传什么就接什么，不需要从任何其他对象转换过来。
+
+  但是从数据库里拿出来的数据格式和前端要的不匹配，就需要转换器
+
+- [ ] 111
