@@ -415,3 +415,56 @@ public class User {
 ## `@Pattern` 注解
 
 `@Pattern` 是 **Java Bean Validation（JSR-303/JSR-380）** 规范中的一个注解，用于**验证字符串字段是否符合指定的正则表达式规则**。
+
+## ==依赖注入==
+
+# 自定义业务异常处理
+
+# Spring-Security
+
+## 配置类和普通类的区别
+
+|                | 普通类（`@Service`/`@Controller`） | 配置类（`@Configuration`）                          |
+| :------------- | :--------------------------------- | :-------------------------------------------------- |
+| **作用**       | 实现业务逻辑                       | 定义 Bean 的创建规则                                |
+| **谁创建它**   | Spring 自动扫描并创建              | Spring 自动扫描并创建                               |
+| **里面有什么** | 业务方法（增删改查）               | `@Bean` 方法（返回对象）                            |
+| **典型例子**   | `UserService`、`UserController`    | `SecurityConfig`、`RedisConfig`、`DataSourceConfig` |
+
+# JWT(**JSON Web Token**) 认证 
+
+**无状态的身份认证**
+
+一个 JWT 看起来像这样：
+
+```
+eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4iLCJpYXQiOjE1MTYyMzkwMjJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+它是三个部分用 `.` 拼接的：
+
+```
+xxxxx.yyyyy.zzzzz
+```
+
+| 部分     | 名称              | 内容                          | 能看懂吗？             |
+| :------- | :---------------- | :---------------------------- | :--------------------- |
+| 第一部分 | Header（头部）    | 加密算法信息                  | Base64编码，解码后可读 |
+| 第二部分 | Payload（载荷）   | 用户信息（如 userId、用户名） | Base64编码，解码后可读 |
+| 第三部分 | Signature（签名） | 前两部分 + 密钥 加密生成      | 不可伪造               |
+
+**关键点：JWT 的内容是可见的（Base64编码），只是不能被篡改。** 所以不要在 JWT 里存密码等敏感信息！
+
+## JWT(**JSON Web Token**) 认证涉及的代码
+
+| 你问的"代码要在哪里写" | 答案                                  |
+| :--------------------- | :------------------------------------ |
+| JWT 生成/解析逻辑      | `service/JwtService.java`             |
+| JWT 拦截过滤器         | `config/JwtAuthenticationFilter.java` |
+| 登录接口               | `controller/UserController.java`      |
+| 登录请求对象           | `DTO/command/LoginRequest.java`       |
+| 登录验证逻辑           | `service/UserService.java`            |
+| 注册过滤器             | `config/SecurityConfig.java`（修改）  |
+| JWT 配置               | `application.yml`                     |
+
+**注意：** 如果 `UserMapper` 里还没有 `findByUsername` 方法，记得在 `UserMapper.java` 里加上
