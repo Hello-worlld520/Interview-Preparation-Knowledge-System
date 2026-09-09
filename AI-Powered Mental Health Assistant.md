@@ -524,3 +524,560 @@ xxxxx.yyyyy.zzzzz
   但是从数据库里拿出来的数据格式和前端要的不匹配，就需要转换器
 
 - [ ] 111
+
+# 9.8任务完成情况
+
+# 今日工作总结
+
+## 目标一：建立统一的业务异常处理机制
+
+### 已完成的行动
+
+1. 创建业务异常类：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/exception/BusinessException.java
+```
+
+1. `BusinessException` 继承 `RuntimeException`，并封装：
+
+```java
+private final ResultCode resultCode;
+```
+
+1. 在 `GlobalExceptionHandler` 中增加统一处理：
+
+```java
+@ExceptionHandler(BusinessException.class)
+public Result<Void> handleBusinessException(BusinessException e) {
+    return Result.failure(e.getResultCode());
+}
+```
+
+1. 处理了原来 `DTO/exception/BusinessException.java` 的重复类问题，使其作为旧路径的兼容类，避免出现重复全限定类名。
+
+------
+
+## 目标二：建立用户状态枚举
+
+### 已完成的行动
+
+修改：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/enumClass/UserStatus.java
+```
+
+增加状态：
+
+```java
+DISABLED(0, "禁用"),
+NORMAL(1, "正常");
+```
+
+增加根据状态代码获取枚举的方法：
+
+```java
+public static UserStatus fromCode(Integer code)
+```
+
+使用示例：
+
+```java
+UserStatus status = UserStatus.fromCode(1);
+```
+
+------
+
+## 目标三：配置接口访问权限
+
+### 已完成的行动
+
+修改：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/config/SecurityConfig.java
+```
+
+免认证接口：
+
+```text
+/api/test
+/api/user/login
+```
+
+配置内容：
+
+```java
+.requestMatchers("/api/test", "/api/user/login").permitAll()
+.anyRequest().authenticated()
+```
+
+同时关闭了 CSRF：
+
+```java
+.csrf(csrf -> csrf.disable())
+```
+
+当前其他接口仍然需要认证。
+
+### 后续需要完成的行动
+
+当前配置仍然启用了 HTTP Basic：
+
+```java
+.httpBasic(httpBasic -> {
+});
+```
+
+接入 JWT 认证过滤器后，需要移除 HTTP Basic，并改为无状态 Session 配置。
+
+------
+
+## 目标四：配置 JWT 参数
+
+### 已完成的行动
+
+在：
+
+```text
+src/main/resources/application.yml
+```
+
+中增加：
+
+```yaml
+jwt:
+  secret: ${JWT_SECRET:change-this-jwt-secret-key-in-production}
+  expiration: ${JWT_EXPIRATION:86400000}
+  header: ${JWT_HEADER:Authorization}
+  prefix: ${JWT_PREFIX:Bearer }
+```
+
+参数含义：
+
+| 配置项       | 作用                       |
+| :----------- | :------------------------- |
+| `secret`     | JWT 签名密钥               |
+| `expiration` | Token 有效期，默认 24 小时 |
+| `header`     | Token 请求头名称           |
+| `prefix`     | Token 前缀，默认 `Bearer`  |
+
+------
+
+## 目标五：创建 JWT 配置类
+
+### 已完成的行动
+
+创建：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/config/JwtProperties.java
+```
+
+使用：
+
+```java
+@Component
+@ConfigurationProperties(prefix = "jwt")
+```
+
+该类可以由 Spring 容器自动注入，并读取 `application.yml` 中的 JWT 配置。
+
+包含字段：
+
+```java
+private String secret;
+private long expiration;
+private String header;
+private String prefix;
+```
+
+------
+
+## 目标六：创建 JWT Token 工具类
+
+### 已完成的行动
+
+创建：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/util/JwtUtil.java
+```
+
+使用 Auth0 Java JWT 实现 Token 操作。
+
+已支持：
+
+```java
+generateToken(String username)
+```
+
+用于生成 Token。
+
+```java
+verifyToken(String token)
+```
+
+用于验证 Token 是否有效。
+
+```java
+getUsername(String token)
+```
+
+用于解析 Token 中的用户名。
+
+Token 中包含：
+
+- `sub`：用户名；
+- `iat`：签发时间；
+- `exp`：过期时间；
+- HMAC256 签名。
+
+------
+
+## 目标七：使用 Spring 容器注入 Bean
+
+### 已完成的行动
+
+最初创建了：
+
+```text
+util/BeanUtil.java
+```
+
+之后按照要求删除了该类。
+
+目前将容器获取功能放入：
+
+```text
+util/JwtUtil.java
+```
+
+`JwtUtil` 实现：
+
+```java
+ApplicationContextAware
+```
+
+并支持：
+
+```java
+JwtUtil.getBean(SomeClass.class);
+```
+
+以及：
+
+```java
+JwtUtil.getBean("beanName", SomeClass.class);
+```
+
+同时，`JwtProperties` 仍然通过构造器注入到 `JwtUtil`：
+
+```java
+private final JwtProperties jwtProperties;
+```
+
+------
+
+## 目标八：创建用户实体转换工具
+
+### 已完成的行动
+
+创建：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/util/UserConvert.java
+```
+
+提供：
+
+```java
+UserConvert.toUserDetailResponse(user);
+```
+
+可以将 `User` 实体转换为：
+
+```java
+UserloginResponseDTO.UserDetailResponseDTO
+```
+
+转换了以下信息：
+
+- 用户名；
+- 邮箱；
+- 昵称；
+- 头像；
+- 手机号；
+- 性别；
+- 生日；
+- 用户类型；
+- 用户状态；
+- 状态展示名称；
+- 创建时间；
+- 更新时间；
+- 显示名称。
+
+同时避免直接返回 `User` 实体中的密码字段。
+
+------
+
+## 目标九：登录时验证密码和用户状态
+
+### 已完成的行动
+
+修改：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/service/UserService.java
+```
+
+登录时验证密码：
+
+```java
+if (user == null || !Objects.equals(user.getPassword(), commandDTO.getPassword())) {
+    throw new BusinessException(ResultCode.UNAUTHORIZED);
+}
+```
+
+验证用户状态：
+
+```java
+if (!Objects.equals(user.getStatus(), UserStatus.NORMAL.getCode())) {
+    throw new BusinessException(ResultCode.FORBIDDEN);
+}
+```
+
+当前只有：
+
+```text
+status = 1
+```
+
+的用户可以登录。
+
+------
+
+## 目标十：登录成功生成 JWT Token
+
+### 已完成的行动
+
+在 `UserService` 中注入：
+
+```java
+@Resource
+private JwtUtil jwtUtil;
+```
+
+登录成功后生成 Token：
+
+```java
+response.setToken(jwtUtil.generateToken(user.getUsername()));
+```
+
+并设置用户信息：
+
+```java
+response.setUserInfo(UserConvert.toUserDetailResponse(user));
+```
+
+修改了：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/DTO/response/UserloginResponseDTO.java
+```
+
+为外层类添加 `@Data`，支持：
+
+```java
+setToken(...)
+setUserInfo(...)
+```
+
+------
+
+## 目标十一：准备 Apifox 登录测试数据
+
+### 已完成的行动
+
+查询了当前数据库：
+
+```text
+数据库：mental_health
+数据表：user
+```
+
+当前用户：
+
+| id   | username | email                 | user_type | status |
+| :--- | :------- | :-------------------- | :-------- | :----- |
+| 1    | `admin`  | `admin@example.com`   | 2         | 1      |
+| 2    | `test`   | `15165@qq.com`        | 1         | 1      |
+| 4    | `ces`    | `111111111111@qq.com` | 1         | 1      |
+
+已将测试用户 `test` 的密码更新为：
+
+```text
+123456
+```
+
+执行语句：
+
+```sql
+UPDATE user
+SET password = '123456'
+WHERE username = 'test';
+```
+
+执行结果：
+
+```text
+affected_rows: 1
+```
+
+因此可以在 Apifox 中测试：
+
+```http
+POST http://localhost:8080/api/user/login
+```
+
+请求体：
+
+```json
+{
+  "username": "test",
+  "password": "123456"
+}
+```
+
+------
+
+## 目标十二：验证项目编译和测试
+
+### 已完成的行动
+
+系统没有直接提供 `mvn` 命令，因此使用 Maven Wrapper 执行：
+
+```bash
+./mvnw test -q
+```
+
+测试已经通过，Spring Boot 应用上下文可以正常启动，JWT 配置类、JWT 工具类和用户转换工具类能够正常编译。
+
+------
+
+# 当前整体状态
+
+目前已经实现：
+
+```text
+登录接口
+    ↓
+查询用户
+    ↓
+验证密码
+    ↓
+验证用户状态
+    ↓
+生成 JWT Token
+    ↓
+返回 Token 和用户信息
+```
+
+但是 JWT 目前还没有完全接入 Spring Security。
+
+# 后续需要完成的行动
+
+## 1. 创建 JWT 认证过滤器
+
+创建：
+
+```text
+src/main/java/org/example/aipoweredmentalhealthassistant/config/JwtAuthenticationFilter.java
+```
+
+负责：
+
+- 从 `Authorization` 请求头读取 Token；
+- 验证 Token；
+- 解析用户名；
+- 写入 `SecurityContext`。
+
+## 2. 将过滤器接入 `SecurityConfig`
+
+增加：
+
+```java
+.addFilterBefore(
+    jwtAuthenticationFilter,
+    UsernamePasswordAuthenticationFilter.class
+)
+```
+
+并配置：
+
+```java
+.sessionManagement(session -> session
+    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+)
+```
+
+## 3. 移除 HTTP Basic
+
+删除：
+
+```java
+.httpBasic(httpBasic -> {
+});
+```
+
+否则 Spring Security 仍会启用默认的 HTTP Basic 登录机制。
+
+## 4. 完善 401 和 403 返回
+
+配置：
+
+- 未携带 Token 时返回 `401`；
+- Token 无效时返回 `401`；
+- 没有权限时返回 `403`。
+
+## 5. 改进密码安全
+
+当前代码是明文密码比较：
+
+```java
+Objects.equals(user.getPassword(), commandDTO.getPassword())
+```
+
+正式环境应改成 BCrypt：
+
+```java
+passwordEncoder.matches(
+    commandDTO.getPassword(),
+    user.getPassword()
+)
+```
+
+并将数据库中的密码保存为 BCrypt 哈希值。
+
+# 创建获取用户接口
+
+* 先登录才能获取用户信息，所以这个不能直接加在白名单里跳过认证
+* 不需要传参数
+
+# JWT认证过滤器
+
+* 用认证器的代码写在配置类里面，不在白名单不能直接跳过认证的就要经过JWT认证过滤器
+* 认证器本身**`TokenAuthenticationFilter`**写在util工具包中
+
+# SecurityConfig：过滤链本身
+
+# TokenAuthenticationFilter：过滤器，拿请求，用token解析出并写入用户信息（或者没有token的无法写入
+
+# JwtUtil：基础的token生成和解析
+
+三者自上而下是调用关系，上面的调用下面的，完成过滤
+
+## **为什么过滤器异常不用全局异常类？**
+
+过滤器中的异常是认证阶段的异常，根本没走到 Controller层呢，所以全局异常处理器抓不到！
