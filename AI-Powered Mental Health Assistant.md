@@ -1,4 +1,4 @@
-# AI-Powered Mental Health Assistant
+# AI-Powered Mental Health Assistant边做边learn
 
 ## 项目技术栈
 
@@ -1081,3 +1081,6 @@ passwordEncoder.matches(
 ## **为什么过滤器异常不用全局异常类？**
 
 过滤器中的异常是认证阶段的异常，根本没走到 Controller层呢，所以全局异常处理器抓不到！
+
+# 会话创建
+
