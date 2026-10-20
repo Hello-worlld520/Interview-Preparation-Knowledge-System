@@ -271,3 +271,22 @@ studio.lingrui.announcement
 
 
 
+#  Kotlin 的作用域函数
+
+**作用域函数（Scope Function）**是 Kotlin 语言里特有的一组**标准库函数**。它的核心作用是：**在一个临时的作用域（大括号 `{ }`）里，方便地访问某个对象，并且根据函数的不同，决定最后返回什么。**
+
+你可以把它理解为**语法糖**：不用它也能写代码，但用了它，代码能写得更紧凑、更易读。
+
+Kotlin 官方一共提供了 5 个作用域函数：`let`、`run`、`with`、`apply`、`also`。
+
+```java
+ private val rateLimitScript = DefaultRedisScript<Long>().apply {
+        setScriptText(
+            ClassPathResource("scripts/sliding_window_rate_limit.lua")
+                .inputStream.bufferedReader().readText()
+        )
+        resultType = Long::class.java
+    }
+```
+
+.apply就是一个作用域函数，
